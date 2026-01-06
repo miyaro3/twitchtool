@@ -224,15 +224,14 @@
         document.getElementById('displayCmd').innerText = `!${cmd}`;
         document.getElementById('displayStopCmd').innerText = `!stop${cmd}`;
 
-        // ★ URLバグ修正：現在のパスを正確に取得する方式に変更
-        const currentPath = window.location.pathname;
-        const dirPath = currentPath.substring(0, currentPath.lastIndexOf('/') + 1);
-        const baseUrl = window.location.origin + dirPath;
+        // ★ ローカル実行(nullバグ)対策の修正
+        // window.location.href (全体のURL) から 最後の "/" までの部分を抜き出す
+        const currentFullUrl = window.location.href.split('?')[0].split('#')[0];
+        const baseUrl = currentFullUrl.substring(0, currentFullUrl.lastIndexOf('/') + 1);
 
         const finalURL = `${baseUrl}news.html?channel=${channel || 'YOUR_ID'}&cmd=${cmd}&font=${font.replace(/ /g,'+')}&size=${size}&color=${color}&bg=${bg}&bcolor=${bcolor}&pos=${pos}&speed=${speed}&loop=${loop}&border=${border}&scroll=${scroll}&outline=${outline}&ocolor=${ocolor}`;
         document.getElementById('finalURL').innerText = finalURL;
 
-        // --- プレビュー表示 ---
         const pCont = document.getElementById('p-container');
         const pText = document.getElementById('p-text');
         const pArea = document.getElementById('preview-area');
@@ -251,7 +250,6 @@
             pText.style.textShadow = `${w} ${w} 0 ${oc}, -${w} -${w} 0 ${oc}, ${w} -${w} 0 ${oc}, -${w} ${w} 0 ${oc}, ${w} 0 0 ${oc}, -${w} 0 0 ${oc}, 0 ${w} 0 ${oc}, 0 -${w} 0 ${oc}`;
         } else { pText.style.textShadow = "none"; }
 
-        // アニメーション再開処理
         pText.style.animation = 'none';
         pText.offsetHeight; 
 
