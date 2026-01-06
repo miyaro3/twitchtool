@@ -41,9 +41,10 @@
         #p-container { position: absolute; width: 100%; white-space: nowrap; box-sizing: border-box; }
         #p-text { display: inline-block; white-space: nowrap; }
         
+        /* ★アニメーションの終点を「文字幅 + 画面幅」に修正 */
         @keyframes preview-scroll-anim {
             from { transform: translateX(0); }
-            to { transform: translateX(-100%); }
+            to { transform: translateX(calc(-100% - 896px)); }
         }
 
         code { background: #444; padding: 2px 5px; border-radius: 3px; font-family: monospace; }
@@ -58,7 +59,7 @@
 
     <div class="section">
         <label>1. TwitchチャンネルID <span class="error-hint">(必須)</span></label>
-        <input type="text" id="channel" placeholder="あなたのIDを入力（例: twitch_streamer）" oninput="update()">
+        <input type="text" id="channel" placeholder="あなたのIDを入力" oninput="update()">
     </div>
 
     <h2>デザインプリセット</h2>
@@ -162,7 +163,7 @@
     <div class="preview-label">REALTIME PREVIEW (Width: 896px)</div>
     <div id="preview-area">
         <div id="p-container">
-            <span id="p-text">プレビューメッセージ：デザインとスクロールの確認用です。</span>
+            <span id="p-text">プレビューメッセージ：最後まで流れてからループします。</span>
         </div>
     </div>
 </div>
@@ -209,7 +210,6 @@
         const font = document.getElementById('font').value;
         const size = parseInt(document.getElementById('size').value) || 32;
         const speed = parseInt(document.getElementById('speed').value) || 150;
-        const pos = document.getElementById('pos').value;
         const outline = parseInt(document.getElementById('outline').value) || 0;
         const color = document.getElementById('color').value.replace('#','');
         const bgAlpha = parseInt(document.getElementById('bgAlpha').value).toString(16).padStart(2, '0');
@@ -224,14 +224,13 @@
         document.getElementById('displayCmd').innerText = `!${cmd}`;
         document.getElementById('displayStopCmd').innerText = `!stop${cmd}`;
 
-        // ★ ローカル実行(nullバグ)対策の修正
-        // window.location.href (全体のURL) から 最後の "/" までの部分を抜き出す
+        // URL生成
         const currentFullUrl = window.location.href.split('?')[0].split('#')[0];
         const baseUrl = currentFullUrl.substring(0, currentFullUrl.lastIndexOf('/') + 1);
-
-        const finalURL = `${baseUrl}news.html?channel=${channel || 'YOUR_ID'}&cmd=${cmd}&font=${font.replace(/ /g,'+')}&size=${size}&color=${color}&bg=${bg}&bcolor=${bcolor}&pos=${pos}&speed=${speed}&loop=${loop}&border=${border}&scroll=${scroll}&outline=${outline}&ocolor=${ocolor}`;
+        const finalURL = `${baseUrl}news.html?channel=${channel || 'YOUR_ID'}&cmd=${cmd}&font=${font.replace(/ /g,'+')}&size=${size}&color=${color}&bg=${bg}&bcolor=${bcolor}&pos=${document.getElementById('pos').value}&speed=${speed}&loop=${loop}&border=${border}&scroll=${scroll}&outline=${outline}&ocolor=${ocolor}`;
         document.getElementById('finalURL').innerText = finalURL;
 
+        // プレビュー反映
         const pCont = document.getElementById('p-container');
         const pText = document.getElementById('p-text');
         const pArea = document.getElementById('preview-area');
@@ -254,11 +253,12 @@
         pText.offsetHeight; 
 
         if (scroll) {
-            pCont.style.paddingLeft = "896px";
+            pText.style.paddingLeft = "896px";
+            // ★ 計算式：(文字幅 + 画面幅) / 速度
             const duration = (pText.offsetWidth + 896) / speed;
             pText.style.animation = `preview-scroll-anim ${duration}s linear infinite`;
         } else {
-            pCont.style.paddingLeft = "15px";
+            pText.style.paddingLeft = "15px";
             pText.style.animation = 'none';
         }
         
@@ -268,13 +268,12 @@
     function copyURL() {
         const channelInput = document.getElementById('channel');
         if (!channelInput.value.trim()) {
-            alert("【エラー】\nTwitchチャンネルIDが入力されていません。\n一番上の項目に、あなたのTwitch IDを入力してください。");
+            alert("エラー：チャンネルIDを入力してください。");
             channelInput.focus();
             return;
         }
-        const text = document.getElementById('finalURL').innerText;
-        navigator.clipboard.writeText(text).then(() => {
-            alert("URLをコピーしました！\nOBSのブラウザソースに貼り付けてください。");
+        navigator.clipboard.writeText(document.getElementById('finalURL').innerText).then(() => {
+            alert("URLをコピーしました！");
         });
     }
 
