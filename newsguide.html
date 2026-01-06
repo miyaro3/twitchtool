@@ -5,7 +5,7 @@
     <title>News Scroll Setup Guide</title>
     <style>
         :root { --primary: #9146ff; --bg: #121212; --card: #1e1e1e; --text: #e0e0e0; }
-        body { font-family: 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: var(--text); background: var(--bg); margin: 0; padding: 20px 20px 200px 20px; }
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: var(--text); background: var(--bg); margin: 0; padding: 20px 20px 250px 20px; }
         .container { max-width: 950px; margin: 0 auto; background: var(--card); padding: 30px; border-radius: 12px; }
         h1 { color: var(--primary); text-align: center; border-bottom: 2px solid #333; padding-bottom: 10px; }
         h2 { color: #00ff7f; border-left: 5px solid #00ff7f; padding-left: 15px; margin-top: 30px; }
@@ -31,9 +31,9 @@
         .url-text { font-family: 'Courier New', monospace; color: #00ff7f; word-break: break-all; font-size: 13px; display: block; margin-bottom: 10px; min-height: 1.2em; }
         .btn-copy { background: var(--primary); color: white; border: none; padding: 15px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; font-size: 1.1em; }
         
-        .command-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9em; }
-        .command-table th, .command-table td { border: 1px solid #444; padding: 10px; text-align: left; }
-        .command-table th { background: #333; color: var(--primary); }
+        .obs-table { width: 100%; border-collapse: collapse; margin-top: 10px; background: #111; }
+        .obs-table td { border: 1px solid #444; padding: 8px 12px; font-size: 0.9em; }
+        .obs-label { color: #00ff7f; width: 120px; }
 
         #preview-wrapper { position: fixed; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.95); border-top: 3px solid var(--primary); z-index: 1000; padding: 15px 0; display: flex; flex-direction: column; align-items: center; }
         .preview-label { font-size: 11px; color: var(--primary); margin-bottom: 5px; font-weight: bold; letter-spacing: 1px; }
@@ -41,14 +41,10 @@
         #p-container { position: absolute; width: 100%; white-space: nowrap; box-sizing: border-box; }
         #p-text { display: inline-block; white-space: nowrap; }
         
-        /* ★アニメーションの終点を「文字幅 + 画面幅」に修正 */
         @keyframes preview-scroll-anim {
             from { transform: translateX(0); }
             to { transform: translateX(calc(-100% - 896px)); }
         }
-
-        code { background: #444; padding: 2px 5px; border-radius: 3px; font-family: monospace; }
-        .error-hint { color: #ff4d4d; font-weight: bold; }
     </style>
     <link id="font-preview-link" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap">
 </head>
@@ -58,8 +54,8 @@
     <h1>News Scroll Setup Guide</h1>
 
     <div class="section">
-        <label>1. TwitchチャンネルID <span class="error-hint">(必須)</span></label>
-        <input type="text" id="channel" placeholder="あなたのIDを入力" oninput="update()">
+        <label>1. TwitchチャンネルID <span style="color:#ff4d4d; font-weight:bold;">(必須)</span></label>
+        <input type="text" id="channel" placeholder="あなたのTwitch IDを入力" oninput="update()">
     </div>
 
     <h2>デザインプリセット</h2>
@@ -135,7 +131,6 @@
                 <input type="color" id="ocolor" value="#000000" oninput="update()">
             </div>
         </div>
-
         <div class="check-group">
             <label class="check-item"><input type="checkbox" id="scroll" checked onchange="update()"> スクロール有効</label>
             <label class="check-item"><input type="checkbox" id="loop" checked onchange="update()"> ループ有効</label>
@@ -143,12 +138,12 @@
         </div>
     </div>
 
-    <h2>チャットコマンド</h2>
+    <h2>OBS推奨設定</h2>
     <div class="section">
-        <table class="command-table">
-            <tr><th>動作</th><th>コマンド</th></tr>
-            <tr><td>開始</td><td><code id="displayCmd">!news</code> [メッセージ]</td></tr>
-            <tr><td>停止</td><td><code id="displayStopCmd">!stopnews</code></td></tr>
+        <table class="obs-table">
+            <tr><td class="obs-label">幅</td><td>896</td></tr>
+            <tr><td class="obs-label">高さ</td><td>200 (フォントサイズに合わせて調整)</td></tr>
+            <tr><td class="obs-label">カスタムCSS</td><td><code>body { background: transparent; overflow: hidden; }</code></td></tr>
         </table>
     </div>
 
@@ -157,13 +152,20 @@
         <span class="url-text" id="finalURL">---</span>
         <button class="btn-copy" onclick="copyURL()">URLをコピー</button>
     </div>
+
+    <h2 style="margin-top:40px;">プレビュー用サンプルメッセージ</h2>
+    <div class="section">
+        <label>ここに好きな文字を入力してください：</label>
+        <input type="text" id="sampleInput" value="ここにメッセージが表示されます。1234567890 abcdefg... 漢字・カタカナ表示確認！" oninput="update()">
+    </div>
 </div>
 
 <div id="preview-wrapper">
-    <div class="preview-label">REALTIME PREVIEW (Width: 896px)</div>
+    <div class="preview-label">REALTIME PREVIEW (896px)</div>
     <div id="preview-area">
         <div id="p-container">
-<span id="p-text">サンプルメッセージ：ここに表示されます。1234567890 あいうえお アイウエオ 漢字 abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ！＃＄％＆＊？！</span>        </div>
+            <span id="p-text">ここにメッセージが表示されます</span>
+        </div>
     </div>
 </div>
 
@@ -218,23 +220,23 @@
         const scroll = document.getElementById('scroll').checked;
         const loop = document.getElementById('loop').checked;
         const border = document.getElementById('border').checked;
+        const sampleMsg = document.getElementById('sampleInput').value;
 
         document.getElementById('bgAlphaVal').innerText = document.getElementById('bgAlpha').value;
-        document.getElementById('displayCmd').innerText = `!${cmd}`;
-        document.getElementById('displayStopCmd').innerText = `!stop${cmd}`;
 
-        // URL生成
-        const currentFullUrl = window.location.href.split('?')[0].split('#')[0];
-        const baseUrl = currentFullUrl.substring(0, currentFullUrl.lastIndexOf('/') + 1);
+        // URL生成 (file://対応)
+        const currentPath = window.location.href.split('?')[0].split('#')[0];
+        const baseUrl = currentPath.substring(0, currentPath.lastIndexOf('/') + 1);
         const finalURL = `${baseUrl}news.html?channel=${channel || 'YOUR_ID'}&cmd=${cmd}&font=${font.replace(/ /g,'+')}&size=${size}&color=${color}&bg=${bg}&bcolor=${bcolor}&pos=${document.getElementById('pos').value}&speed=${speed}&loop=${loop}&border=${border}&scroll=${scroll}&outline=${outline}&ocolor=${ocolor}`;
         document.getElementById('finalURL').innerText = finalURL;
 
         // プレビュー反映
-        const pCont = document.getElementById('p-container');
         const pText = document.getElementById('p-text');
         const pArea = document.getElementById('preview-area');
+        const pCont = document.getElementById('p-container');
 
-        pArea.style.height = (size + 24) + "px";
+        pText.innerText = sampleMsg;
+        pArea.style.height = (size + 30) + "px";
         pCont.style.backgroundColor = `#${bg}`;
         pCont.style.borderTop = border ? `2px solid #${bcolor}` : "none";
         pCont.style.borderBottom = border ? `2px solid #${bcolor}` : "none";
@@ -248,12 +250,12 @@
             pText.style.textShadow = `${w} ${w} 0 ${oc}, -${w} -${w} 0 ${oc}, ${w} -${w} 0 ${oc}, -${w} ${w} 0 ${oc}, ${w} 0 0 ${oc}, -${w} 0 0 ${oc}, 0 ${w} 0 ${oc}, 0 -${w} 0 ${oc}`;
         } else { pText.style.textShadow = "none"; }
 
+        // アニメーション再開
         pText.style.animation = 'none';
         pText.offsetHeight; 
 
         if (scroll) {
             pText.style.paddingLeft = "896px";
-            // ★ 計算式：(文字幅 + 画面幅) / 速度
             const duration = (pText.offsetWidth + 896) / speed;
             pText.style.animation = `preview-scroll-anim ${duration}s linear infinite`;
         } else {
@@ -265,21 +267,14 @@
     }
 
     function copyURL() {
-        const channelInput = document.getElementById('channel');
-        if (!channelInput.value.trim()) {
-            alert("エラー：チャンネルIDを入力してください。");
-            channelInput.focus();
-            return;
-        }
-        navigator.clipboard.writeText(document.getElementById('finalURL').innerText).then(() => {
-            alert("URLをコピーしました！");
-        });
+        const ch = document.getElementById('channel').value.trim();
+        if (!ch) { alert("Twitch IDを入力してください！"); return; }
+        navigator.clipboard.writeText(document.getElementById('finalURL').innerText).then(() => alert("コピーしました！"));
     }
 
     initPresets();
     update();
     setTimeout(update, 1000);
 </script>
-
 </body>
 </html>
