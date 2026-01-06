@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Twitch Universal News Scroll</title>
+    <link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/comfy.js@latest/dist/comfy.min.js"></script>
+    <style>
+        :root {
+            --font-size: 32px;
+            --container-height: 60px; /* ★高さを固定してガタつきを防止 */
+        }
+        body {
+            margin: 0; padding: 0;
+            width: 896px; height: 504px;
+            overflow: hidden; background-color: transparent;
+        }
+        #scroll-container {
+            position: absolute; 
+            left: 0; 
+            width: 896px;
+            height: var(--container-height); /* ★固定高 */
+            line-height: calc(var(--container-height) - 20px); /* ★文字を中央に */
+            overflow: hidden; 
+            white-space: nowrap;
+            display: none;
+            box-sizing: border-box; /* ★重要：borderを含めて高さを計算 */
+            padding: 10px 0;
+        }
+        #scroll-text {
+            display: inline-block;
+            font-family: 'DotGothic16', sans-serif;
+            font-size: var(--font-size);
+            animation-timing-function: linear;
+            vertical-align: middle;
+        }
+        @keyframes scroll-left {
+            from { transform: translateX(0); }
+            to { transform: translateX(calc(-100% - 896px)); }
+        }
+    </style>
+</head>
+<body>
+    <div id="scroll-container">
+        <div id="scroll-text"></div>
+    </div>
+
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const formatColor = (c) => (c && !c.startsWith('#')) ? '#' + c : c;
+
+        const config = {
+            channel: params.get('channel'),
+            cmd: params.get('cmd') || 'news',
+            font: params.get('font') || 'DotGothic16',
+            size: parseInt(params.get('size')) || 32,
+            color: params.get('color') || 'ffffff',
+            bg: params.get('bg') || '000000cc',
+            bcolor: params.get('bcolor'),
+            pos: params.get('pos') || 'top',
+            speed: parseInt(params.get('speed')) || 150,
+            loop: params.get('loop') !== 'false',
+            border: params.get('border') === 'true',
+            scroll: params.get('scroll') !== 'false',
+            outline: parseInt(params.get('outline')) || 0,
+            ocolor: params.get('ocolor') || '000000'
+        };
+
+        const container = document.getElementById('scroll-container');
+        const textElem = document.getElementById('scroll-text');
+
+        // --- 初期設定を一度に行う関数 ---
+        function setupStyles() {
+            // 高さの自動調整（文字サイズに合わせる）
+            const totalHeight = config.size + 24; 
+            container.style.height = totalHeight + "px";
+            container.style.lineHeight = (totalHeight - (config.border ? 24 : 20)) + "px";
+
+            if (config.font !== 'DotGothic16') {
+                const link = document.createElement('link');
+                link.rel = 'stylesheet';
+                link.href = `https://fonts.googleapis.com/css2?family=${config.font.replace(/\s+/g, '+')}&display=swap`;
+                document.head.appendChild(link);
+                textElem.style.fontFamily = `"${config.font}", sans-serif`;
+            }
+
+            container.style[config.pos] = "20px";
+            container.style.backgroundColor = formatColor(config.bg);
+            textElem.style.color = formatColor(config.color);
+            textElem.style.fontSize = config.size + "px";
+
+            if (config.border) {
+                const bCol = formatColor(config.bcolor || config.color);
+                container.style.borderTop = `2px solid ${bCol}`;
+                container.style.borderBottom = `2px solid ${bCol}`;
+            }
+
+            if (config.outline > 0) {
+                const w = config.outline + "px";
+                const oc = formatColor(config.ocolor);
+                textElem.style.textShadow = `${w} ${w} 0 ${oc}, -${w} -${w} 0 ${oc}, ${w} -${w} 0 ${oc}, -${w} ${w} 0 ${oc}, ${w} 0 0 ${oc}, -${w} 0 0 ${oc}, 0 ${w} 0 ${oc}, 0 -${w} 0 ${oc}`;
+            }
+        }
+
+        setupStyles(); // 起動時に設定完了させておく
+
+        if (config.channel) {
+            ComfyJS.Init(config.channel);
+        }
+
+        ComfyJS.onCommand = (user, command, message, flags, extra) => {
+            if (command === config.cmd && message) {
+                textElem.innerText = message;
+                container.style.display = 'block'; // スタイル設定後に表示
+                
+                textElem.style.animation = 'none';
+                textElem.offsetHeight; 
+
+                if (config.scroll) {
+                    textElem.style.paddingLeft = "896px"; 
+                    const textWidth = textElem.offsetWidth;
+                    const duration = (textWidth + 896) / config.speed;
+                    textElem.style.animation = `scroll-left ${duration}s linear ${config.loop ? 'infinite' : '1'}`;
+                    
+                    if (!config.loop) {
+                        setTimeout(() => { container.style.display = 'none'; }, duration * 1000);
+                    }
+                } else {
+                    textElem.style.animation = "none";
+                    textElem.style.paddingLeft = "15px";
+                }
+            }
+            if (command === "stop" + config.cmd) {
+                container.style.display = 'none';
+                textElem.style.animation = 'none';
+            }
+        };
+    </script>
+</body>
+</html>
