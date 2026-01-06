@@ -8,7 +8,7 @@
     <style>
         :root {
             --font-size: 32px;
-            --container-height: 60px; /* ★高さを固定してガタつきを防止 */
+            --container-height: 60px;
         }
         body {
             margin: 0; padding: 0;
@@ -19,12 +19,12 @@
             position: absolute; 
             left: 0; 
             width: 896px;
-            height: var(--container-height); /* ★固定高 */
-            line-height: calc(var(--container-height) - 20px); /* ★文字を中央に */
+            height: var(--container-height);
+            line-height: calc(var(--container-height) - 20px);
             overflow: hidden; 
             white-space: nowrap;
             display: none;
-            box-sizing: border-box; /* ★重要：borderを含めて高さを計算 */
+            box-sizing: border-box;
             padding: 10px 0;
         }
         #scroll-text {
@@ -69,9 +69,7 @@
         const container = document.getElementById('scroll-container');
         const textElem = document.getElementById('scroll-text');
 
-        // --- 初期設定を一度に行う関数 ---
         function setupStyles() {
-            // 高さの自動調整（文字サイズに合わせる）
             const totalHeight = config.size + 24; 
             container.style.height = totalHeight + "px";
             container.style.lineHeight = (totalHeight - (config.border ? 24 : 20)) + "px";
@@ -102,16 +100,19 @@
             }
         }
 
-        setupStyles(); // 起動時に設定完了させておく
+        setupStyles();
 
         if (config.channel) {
             ComfyJS.Init(config.channel);
         }
 
         ComfyJS.onCommand = (user, command, message, flags, extra) => {
-            if (command === config.cmd && message) {
+            // ★ 権限チェック：配信者(broadcaster) または モデレーター(moderator) のみ許可
+            const hasPermission = flags.broadcaster || flags.moderator;
+
+            if (hasPermission && command === config.cmd && message) {
                 textElem.innerText = message;
-                container.style.display = 'block'; // スタイル設定後に表示
+                container.style.display = 'block';
                 
                 textElem.style.animation = 'none';
                 textElem.offsetHeight; 
@@ -130,7 +131,9 @@
                     textElem.style.paddingLeft = "15px";
                 }
             }
-            if (command === "stop" + config.cmd) {
+
+            // ストップコマンドも権限がある場合のみ有効
+            if (hasPermission && command === "stop" + config.cmd) {
                 container.style.display = 'none';
                 textElem.style.animation = 'none';
             }
