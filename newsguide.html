@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>News Scroll Setup Guide</title>
+    <style>
+        :root { --primary: #9146ff; --bg: #121212; --card: #1e1e1e; --text: #e0e0e0; }
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: var(--text); background: var(--bg); margin: 0; padding: 20px 20px 200px 20px; }
+        .container { max-width: 950px; margin: 0 auto; background: var(--card); padding: 30px; border-radius: 12px; }
+        h1 { color: var(--primary); text-align: center; border-bottom: 2px solid #333; padding-bottom: 10px; }
+        h2 { color: #00ff7f; border-left: 5px solid #00ff7f; padding-left: 15px; margin-top: 30px; }
+        
+        .section { background: #252525; padding: 20px; border-radius: 8px; margin: 15px 0; border: 1px solid #333; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; }
+        label { display: block; font-size: 0.85em; margin-bottom: 5px; color: #bbb; }
+        input, select { width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #444; background: #111; color: #fff; box-sizing: border-box; }
+        
+        .preset-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 20px; }
+        .btn-preset { padding: 10px 5px; font-size: 0.8em; background: #333; color: white; border: 1px solid #555; cursor: pointer; border-radius: 4px; transition: 0.2s; }
+        .btn-preset:hover { background: var(--primary); border-color: var(--primary); }
+
+        .ui-row { display: flex; align-items: center; gap: 15px; margin-bottom: 15px; flex-wrap: wrap; }
+        .ui-item { flex: 1; min-width: 200px; }
+        input[type="color"] { width: 45px; height: 40px; padding: 2px; cursor: pointer; border: none; background: none; vertical-align: middle; }
+        
+        .check-group { display: flex; align-items: center; gap: 20px; margin-top: 10px; }
+        .check-item { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+        .check-item input { width: 18px; height: 18px; margin: 0; cursor: pointer; }
+
+        .url-box { background: #000; padding: 15px; border-radius: 6px; margin-top: 15px; border: 2px solid var(--primary); }
+        .url-text { font-family: 'Courier New', monospace; color: #00ff7f; word-break: break-all; font-size: 13px; display: block; margin-bottom: 10px; min-height: 1.2em; }
+        .btn-copy { background: var(--primary); color: white; border: none; padding: 15px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; font-size: 1.1em; }
+        
+        .command-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9em; }
+        .command-table th, .command-table td { border: 1px solid #444; padding: 10px; text-align: left; }
+        .command-table th { background: #333; color: var(--primary); }
+
+        #preview-wrapper { position: fixed; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.95); border-top: 3px solid var(--primary); z-index: 1000; padding: 15px 0; display: flex; flex-direction: column; align-items: center; }
+        .preview-label { font-size: 11px; color: var(--primary); margin-bottom: 5px; font-weight: bold; letter-spacing: 1px; }
+        #preview-area { width: 896px; min-height: 80px; position: relative; overflow: hidden; background: #333; box-shadow: 0 0 15px rgba(0,0,0,0.5); display: flex; align-items: center; }
+        #p-container { position: absolute; width: 100%; white-space: nowrap; box-sizing: border-box; }
+        #p-text { display: inline-block; white-space: nowrap; }
+        
+        @keyframes preview-scroll-anim {
+            from { transform: translateX(0); }
+            to { transform: translateX(-100%); }
+        }
+
+        code { background: #444; padding: 2px 5px; border-radius: 3px; font-family: monospace; }
+        .error-hint { color: #ff4d4d; font-weight: bold; }
+    </style>
+    <link id="font-preview-link" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap">
+</head>
+<body>
+
+<div class="container">
+    <h1>News Scroll Setup Guide</h1>
+
+    <div class="section">
+        <label>1. TwitchチャンネルID <span class="error-hint">(必須)</span></label>
+        <input type="text" id="channel" placeholder="あなたのIDを入力（例: twitch_streamer）" oninput="update()">
+    </div>
+
+    <h2>デザインプリセット</h2>
+    <div class="preset-grid" id="preset-container"></div>
+
+    <h2>詳細設定</h2>
+    <div class="section grid">
+        <div>
+            <label>反応コマンド名</label>
+            <input type="text" id="cmd" value="news" oninput="update()">
+        </div>
+        <div>
+            <label>フォント</label>
+            <select id="font" onchange="update()">
+                <optgroup label="ドット・レトロ">
+                    <option value="DotGothic16">DotGothic16</option>
+                    <option value="Stick">Stick</option>
+                    <option value="Hachi Maru Pop">はちまるポップ</option>
+                </optgroup>
+                <optgroup label="モダン・おしゃれ">
+                    <option value="Zen Kaku Gothic New">Zen Kaku Gothic</option>
+                    <option value="Noto Sans JP">Noto Sans JP</option>
+                    <option value="Montserrat">Montserrat</option>
+                </optgroup>
+                <optgroup label="和風・太字">
+                    <option value="Yuji Syuku">Yuji Syuku</option>
+                    <option value="Dela Gothic One">Dela Gothic One</option>
+                    <option value="Potta One">Potta One</option>
+                </optgroup>
+            </select>
+        </div>
+        <div>
+            <label>文字サイズ (px)</label>
+            <input type="number" id="size" value="32" oninput="update()">
+        </div>
+        <div>
+            <label>速度 (秒速px)</label>
+            <input type="number" id="speed" value="150" oninput="update()">
+        </div>
+        <div>
+            <label>位置</label>
+            <select id="pos" onchange="update()">
+                <option value="top">上部 (Top)</option>
+                <option value="bottom">下部 (Bottom)</option>
+            </select>
+        </div>
+        <div>
+            <label>フチの太さ (px)</label>
+            <input type="number" id="outline" value="0" min="0" oninput="update()">
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="ui-row">
+            <div class="ui-item">
+                <label>文字色</label>
+                <input type="color" id="color" value="#ffffff" oninput="update()">
+            </div>
+            <div class="ui-item">
+                <label>背景色と透明度</label>
+                <input type="color" id="bg" value="#000000" oninput="update()">
+                <input type="range" id="bgAlpha" min="0" max="255" value="204" oninput="update()" style="width:100px;">
+                <span id="bgAlphaVal">204</span>
+            </div>
+        </div>
+        <div class="ui-row">
+            <div class="ui-item">
+                <label>上下枠線の色</label>
+                <input type="color" id="bcolor" value="#ffffff" oninput="update()">
+            </div>
+            <div class="ui-item">
+                <label>フチの色</label>
+                <input type="color" id="ocolor" value="#000000" oninput="update()">
+            </div>
+        </div>
+
+        <div class="check-group">
+            <label class="check-item"><input type="checkbox" id="scroll" checked onchange="update()"> スクロール有効</label>
+            <label class="check-item"><input type="checkbox" id="loop" checked onchange="update()"> ループ有効</label>
+            <label class="check-item"><input type="checkbox" id="border" onchange="update()"> 上下枠線あり</label>
+        </div>
+    </div>
+
+    <h2>チャットコマンド</h2>
+    <div class="section">
+        <table class="command-table">
+            <tr><th>動作</th><th>コマンド</th></tr>
+            <tr><td>開始</td><td><code id="displayCmd">!news</code> [メッセージ]</td></tr>
+            <tr><td>停止</td><td><code id="displayStopCmd">!stopnews</code></td></tr>
+        </table>
+    </div>
+
+    <h2>生成URL</h2>
+    <div class="url-box">
+        <span class="url-text" id="finalURL">---</span>
+        <button class="btn-copy" onclick="copyURL()">URLをコピー</button>
+    </div>
+</div>
+
+<div id="preview-wrapper">
+    <div class="preview-label">REALTIME PREVIEW (Width: 896px)</div>
+    <div id="preview-area">
+        <div id="p-container">
+            <span id="p-text">プレビューメッセージ：デザインとスクロールの確認用です。</span>
+        </div>
+    </div>
+</div>
+
+<script>
+    const presets = [
+        { name: "1. 標準ニュース", font: "DotGothic16", color: "#ffffff", bg: "#000000", bgAlpha: "204", bcolor: "#ffffff", border: false, outline: 0, ocolor: "#000000", scroll: true },
+        { name: "2. サイバー(緑)", font: "DotGothic16", color: "#00ff00", bg: "#000000", bgAlpha: "255", bcolor: "#00ff00", border: true, outline: 1, ocolor: "#003300", scroll: true },
+        { name: "3. 緊急速報", font: "Dela Gothic One", color: "#ffffff", bg: "#ff0000", bgAlpha: "230", bcolor: "#ffffff", border: true, outline: 2, ocolor: "#000000", scroll: true },
+        { name: "4. 和風告知", font: "Yuji Syuku", color: "#f0e68c", bg: "#2f4f4f", bgAlpha: "200", bcolor: "#f0e68c", border: false, outline: 1, ocolor: "#000000", scroll: true },
+        { name: "5. ゆめかわ", font: "Hachi Maru Pop", color: "#ffffff", bg: "#ff69b4", bgAlpha: "180", bcolor: "#ffffff", border: true, outline: 1, ocolor: "#ff1493", scroll: true },
+        { name: "6. 固定掲示板", font: "Stick", color: "#ffff00", bg: "#000000", bgAlpha: "220", bcolor: "#ffff00", border: true, outline: 2, ocolor: "#000000", scroll: false },
+        { name: "7. ダークナイト", font: "Zen Kaku Gothic New", color: "#bbbbbb", bg: "#1a1a1a", bgAlpha: "255", bcolor: "#444444", border: true, outline: 1, ocolor: "#000000", scroll: true },
+        { name: "8. レトロゲーム", font: "DotGothic16", color: "#ffffff", bg: "#000080", bgAlpha: "255", bcolor: "#ffffff", border: true, outline: 2, ocolor: "#000000", scroll: true },
+        { name: "9. エレガント", font: "Kaisei Tokumin", color: "#d4af37", bg: "#1b1b1b", bgAlpha: "220", bcolor: "#d4af37", border: false, outline: 1, ocolor: "#000000", scroll: true },
+        { name: "10. ポップ", font: "Potta One", color: "#ffffff", bg: "#3498db", bgAlpha: "210", bcolor: "#ffffff", border: false, outline: 2, ocolor: "#002244", scroll: true }
+    ];
+
+    function initPresets() {
+        const container = document.getElementById('preset-container');
+        presets.forEach(p => {
+            const btn = document.createElement('button');
+            btn.className = 'btn-preset';
+            btn.innerText = p.name;
+            btn.onclick = () => {
+                document.getElementById('font').value = p.font;
+                document.getElementById('color').value = p.color;
+                document.getElementById('bg').value = p.bg;
+                document.getElementById('bgAlpha').value = p.bgAlpha;
+                document.getElementById('bcolor').value = p.bcolor;
+                document.getElementById('border').checked = p.border;
+                document.getElementById('outline').value = p.outline;
+                document.getElementById('ocolor').value = p.ocolor;
+                document.getElementById('scroll').checked = p.scroll;
+                update();
+            };
+            container.appendChild(btn);
+        });
+    }
+
+    function update() {
+        const channel = document.getElementById('channel').value.trim();
+        const cmd = document.getElementById('cmd').value || 'news';
+        const font = document.getElementById('font').value;
+        const size = parseInt(document.getElementById('size').value) || 32;
+        const speed = parseInt(document.getElementById('speed').value) || 150;
+        const pos = document.getElementById('pos').value;
+        const outline = parseInt(document.getElementById('outline').value) || 0;
+        const color = document.getElementById('color').value.replace('#','');
+        const bgAlpha = parseInt(document.getElementById('bgAlpha').value).toString(16).padStart(2, '0');
+        const bg = document.getElementById('bg').value.replace('#','') + bgAlpha;
+        const bcolor = document.getElementById('bcolor').value.replace('#','');
+        const ocolor = document.getElementById('ocolor').value.replace('#','');
+        const scroll = document.getElementById('scroll').checked;
+        const loop = document.getElementById('loop').checked;
+        const border = document.getElementById('border').checked;
+
+        document.getElementById('bgAlphaVal').innerText = document.getElementById('bgAlpha').value;
+        document.getElementById('displayCmd').innerText = `!${cmd}`;
+        document.getElementById('displayStopCmd').innerText = `!stop${cmd}`;
+
+        // ★ URLバグ修正：現在のパスを正確に取得する方式に変更
+        const currentPath = window.location.pathname;
+        const dirPath = currentPath.substring(0, currentPath.lastIndexOf('/') + 1);
+        const baseUrl = window.location.origin + dirPath;
+
+        const finalURL = `${baseUrl}news.html?channel=${channel || 'YOUR_ID'}&cmd=${cmd}&font=${font.replace(/ /g,'+')}&size=${size}&color=${color}&bg=${bg}&bcolor=${bcolor}&pos=${pos}&speed=${speed}&loop=${loop}&border=${border}&scroll=${scroll}&outline=${outline}&ocolor=${ocolor}`;
+        document.getElementById('finalURL').innerText = finalURL;
+
+        // --- プレビュー表示 ---
+        const pCont = document.getElementById('p-container');
+        const pText = document.getElementById('p-text');
+        const pArea = document.getElementById('preview-area');
+
+        pArea.style.height = (size + 24) + "px";
+        pCont.style.backgroundColor = `#${bg}`;
+        pCont.style.borderTop = border ? `2px solid #${bcolor}` : "none";
+        pCont.style.borderBottom = border ? `2px solid #${bcolor}` : "none";
+
+        pText.style.fontFamily = `"${font}", sans-serif`;
+        pText.style.fontSize = size + "px";
+        pText.style.color = `#${color}`;
+        
+        if (outline > 0) {
+            const w = outline + "px"; const oc = `#${ocolor}`;
+            pText.style.textShadow = `${w} ${w} 0 ${oc}, -${w} -${w} 0 ${oc}, ${w} -${w} 0 ${oc}, -${w} ${w} 0 ${oc}, ${w} 0 0 ${oc}, -${w} 0 0 ${oc}, 0 ${w} 0 ${oc}, 0 -${w} 0 ${oc}`;
+        } else { pText.style.textShadow = "none"; }
+
+        // アニメーション再開処理
+        pText.style.animation = 'none';
+        pText.offsetHeight; 
+
+        if (scroll) {
+            pCont.style.paddingLeft = "896px";
+            const duration = (pText.offsetWidth + 896) / speed;
+            pText.style.animation = `preview-scroll-anim ${duration}s linear infinite`;
+        } else {
+            pCont.style.paddingLeft = "15px";
+            pText.style.animation = 'none';
+        }
+        
+        document.getElementById('font-preview-link').href = `https://fonts.googleapis.com/css2?family=${font.replace(/ /g,'+')}&display=swap`;
+    }
+
+    function copyURL() {
+        const channelInput = document.getElementById('channel');
+        if (!channelInput.value.trim()) {
+            alert("【エラー】\nTwitchチャンネルIDが入力されていません。\n一番上の項目に、あなたのTwitch IDを入力してください。");
+            channelInput.focus();
+            return;
+        }
+        const text = document.getElementById('finalURL').innerText;
+        navigator.clipboard.writeText(text).then(() => {
+            alert("URLをコピーしました！\nOBSのブラウザソースに貼り付けてください。");
+        });
+    }
+
+    initPresets();
+    update();
+    setTimeout(update, 1000);
+</script>
+
+</body>
+</html>
