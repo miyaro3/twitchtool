@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemma 3 (27B) GAS設定完全版</title>
+    <style>
+        :root {
+            --bg-color: #f4f7f6;
+            --card-bg: #ffffff;
+            --primary-blue: #1a73e8;
+            --primary-green: #34a853;
+            --code-bg: #1e1e1e;
+            --code-text: #32cd32;
+        }
+        body { font-family: sans-serif; line-height: 1.6; color: #333; max-width: 900px; margin: 0 auto; padding: 20px; background-color: var(--bg-color); }
+        h1 { color: var(--primary-blue); border-bottom: 3px solid var(--primary-blue); padding-bottom: 10px; }
+        h2 { background: #e8f0fe; padding: 10px; border-radius: 5px; margin-top: 30px; font-size: 1.2em; display: flex; align-items: center; }
+        .step-num { background: var(--primary-blue); color: white; border-radius: 50%; width: 25px; height: 25px; display: flex; align-items: center; justify-content: center; margin-right: 10px; font-size: 0.8em; }
+        .card { background: var(--card-bg); padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 25px; }
+        
+        .btn-group { display: flex; gap: 10px; flex-wrap: wrap; margin: 15px 0; }
+        .btn-link { display: inline-block; background: var(--primary-blue); color: white; padding: 12px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; transition: opacity 0.2s; }
+        .btn-link.green { background: var(--primary-green); }
+        .btn-link:hover { opacity: 0.8; }
+
+        .code-container { position: relative; margin: 20px 0; }
+        pre { background-color: var(--code-bg); color: var(--code-text); padding: 20px; border-radius: 8px; overflow-x: auto; font-family: 'Consolas', 'Monaco', monospace; border: 1px solid #444; font-size: 14px; }
+        .copy-btn { position: absolute; top: 10px; right: 10px; background: #444; color: #fff; border: 1px solid #666; padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+        
+        .important { border-left: 5px solid #ff5722; background: #fff3e0; padding: 15px; margin: 15px 0; border-radius: 0 8px 8px 0; }
+        .badge { background: #ff5722; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <h1>Gemma 3 (27B) 設定マニュアル</h1>
+    <p>このページの手順通りに進めるだけで、1日1.4万回使えるAI辞書が完成します。</p>
+
+    <div class="card">
+        <h2><span class="step-num">1</span> APIキーを取得する</h2>
+        <p>まずはGoogleのAI開発環境からAPIキーを発行してください（無料）。</p>
+        <div class="btn-group">
+            <a href="https://aistudio.google.com/app/apikey" target="_blank" class="btn-link">Google AI Studio でキーを取得 ↗</a>
+        </div>
+        <p><small>※「Create API key」をクリックして、<code>AIza...</code> で始まる文字をコピーしておきます。</small></p>
+    </div>
+
+    <div class="card">
+        <h2><span class="step-num">2</span> GASエディタを開く</h2>
+        <p>Google Apps Script（プログラムを動かす場所）を新規作成します。</p>
+        <div class="btn-group">
+            <a href="https://script.google.com/home/projects/create" target="_blank" class="btn-link green">GASエディタを新規作成 ↗</a>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2><span class="step-num">3</span> コードを貼り付ける</h2>
+        <p>エディタ内の文字をすべて消して、以下のコードを貼り付けてください。</p>
+        <div class="important">
+            <strong>【書き換え必須】</strong> コード内の <code>const apiKey = "あなたのAPIキー";</code> の部分を、手順1で取得したキーに書き換えてください。
+        </div>
+        
+        <div class="code-container">
+            <button class="copy-btn" onclick="copyCode(this)">コードをコピー</button>
+            <pre id="gasCode">
+function doGet(e) {
+  // --- 設定エリア ---
+  const apiKey = "あなたのAPIキー"; 
+  const modelName = "models/gemma-3-4b-it";
+  // ----------------
+
+  const word = e.parameter.q; 
+  if (!word) return ContentService.createTextOutput("単語(q)を指定してください");
+
+  const prompt = `「${word}」について、250文字以内で簡潔に説明してください。`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/${modelName}:generateContent?key=${apiKey}`;
+
+  const payload = {
+    "contents": [{ "parts": [{ "text": prompt }] }]
+  };
+
+  const options = {
+    "method": "post",
+    "contentType": "application/json",
+    "payload": JSON.stringify(payload),
+    "muteHttpExceptions": true 
+  };
+
+  try {
+    const response = UrlFetchApp.fetch(url, options);
+    const json = JSON.parse(response.getContentText());
+    if (json.error) return ContentService.createTextOutput("Error: " + json.error.message);
+    
+    const answer = json.candidates[0].content.parts[0].text;
+    return ContentService.createTextOutput(answer);
+  } catch (error) {
+    return ContentService.createTextOutput("System Error: " + error.toString());
+  }
+}</pre>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2><span class="step-num">4</span> デプロイ（公開）</h2>
+        <ol>
+            <li>エディタ右上の<strong>「デプロイ」</strong>＞<strong>「新しいデプロイ」</strong>。</li>
+            <li>「種類の選択」で<strong>「ウェブアプリ」</strong>を選択。</li>
+            <li>「アクセスできるユーザー」を<strong>「全員」</strong>に変更（重要）。</li>
+            <li>「デプロイ」を押し、承認画面が出たら「許可」を繰り返します。</li>
+        </ol>
+        <p>表示された<strong>「ウェブアプリのURL」</strong>をコピーして完了です！</p>
+        <div class="important">
+            <strong>実行例:</strong> <code>コピーしたURL?q=りんご</code>
+        </div>
+        <p><span class="badge">LIMIT</span> 1日 <b>14,400回</b> まで利用可能です。</p>
+    </div>
+
+    <script>
+        async function copyCode(btn) {
+            const code = document.getElementById('gasCode').innerText;
+            try {
+                await navigator.clipboard.writeText(code);
+                btn.innerText = 'コピー完了！';
+                setTimeout(() => { btn.innerText = 'コードをコピー'; }, 2000);
+            } catch (err) {
+                alert('コピーに失敗しました');
+            }
+        }
+    </script>
+
+</body>
+</html>
