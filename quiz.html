@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Twitch Quiz & Bet - Final Stabilized</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: transparent; font-family: 'Arial', 'Meiryo', sans-serif; color: white; }
+        #stage { width: 852px; height: 480px; position: relative; display: flex; }
+        #sidebar { width: 180px; background: rgba(0, 0, 0, 0.85); border-right: 2px solid #444; padding: 10px; box-sizing: border-box; }
+        #sidebar h3 { font-size: 14px; margin: 0 0 10px 0; color: #ffee00; text-align: center; }
+        .score-item { font-size: 12px; margin-bottom: 5px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; padding: 2px 0; }
+        #main-area { flex-grow: 1; display: flex; flex-direction: column; position: relative; }
+        #question-box { height: 110px; background: rgba(0, 0, 0, 0.9); margin: 10px; padding: 10px 15px; border-radius: 10px; border: 2px solid #fff; font-size: 18px; font-weight: bold; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+        #answer-zones { flex-grow: 1; display: grid; grid-template-columns: repeat(2, 1fr); grid-template-rows: repeat(2, 1fr); gap: 10px; padding: 10px; }
+        .zone { background: rgba(255, 255, 255, 0.05); border-radius: 8px; border: 1px dashed #666; position: relative; }
+        .zone-label { position: absolute; top: 5px; left: 5px; background: rgba(0,0,0,0.6); padding: 2px 8px; border-radius: 4px; font-size: 14px; color: #ffee00; font-weight: bold; }
+        .cat-container { position: absolute; width: 60px; display: flex; flex-direction: column; align-items: center; transition: left 0.8s ease-in-out, top 0.8s ease-in-out, opacity 2.0s, transform 2.5s; z-index: 10; }
+        .bet-amount-label { font-size: 12px; color: #ffee00; font-weight: bold; text-shadow: 1px 1px 2px #000; margin-bottom: 2px; height: 14px; }
+        .pixel-grid { display: grid; grid-template-columns: repeat(12, 4px); grid-template-rows: repeat(10, 4px); animation: float 2.5s infinite ease-in-out; }
+        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+        .px { width: 4px; height: 4px; }
+        .user-name { font-size: 10px; text-align: center; text-shadow: 2px 2px 2px #000; margin-top: 4px; font-weight: bold; white-space: nowrap; }
+        .happy-jump { animation: happy 0.4s infinite !important; }
+        @keyframes happy { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-35px) scale(1.1); } }
+        .sink-down { transform: translateY(150px) rotate(15deg) !important; opacity: 0 !important; pointer-events: none; }
+    </style>
+</head>
+<body>
+    <div id="stage">
+        <div id="sidebar"><h3>SCORE RANKING</h3><div id="score-list"></div></div>
+        <div id="main-area">
+            <div id="question-box">!quiz または !bet で開始</div>
+            <div id="answer-zones">
+                <div class="zone" id="zone-1"><span class="zone-label">!1</span></div>
+                <div class="zone" id="zone-2"><span class="zone-label">!2</span></div>
+                <div class="zone" id="zone-3"><span class="zone-label">!3</span></div>
+                <div class="zone" id="zone-4"><span class="zone-label">!4</span></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/comfy.js@latest/dist/comfy.min.js"></script>
+    <script>
+        const CONFIG = { DEFAULT_POINTS: 100, DEFAULT_BET: 100, CAT_SHAPE: ["000000000000", "010000000100", "011000001100", "111111111104", "112111121104", "111133111144", "111111111140", "011111111100", "001100011000", "000000000000"].join(""), COLORS: { EYE: "#000000", DETAIL: "#ffb7c5" } };
+        let scores = {}, quizActive = false, gameMode = "quiz", currentQuizPoints = CONFIG.DEFAULT_POINTS, participants = {}, currentQuestionText = "", totalPool = 0, closeTimerInterval = null;
+        const params = new URLSearchParams(window.location.search);
+        const channel = params.get('channel');
+        if (channel) ComfyJS.Init(channel);
+
+        function getUserColors(name) {
+            let hash = 0; for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+            const h = Math.abs(hash) % 360; return { main: `hsl(${h}, 70%, 75%)`, dark: `hsl(${h}, 60%, 55%)` };
+        }
+
+        ComfyJS.onCommand = (user, command, message, flags, extra) => {
+            if (flags.broadcaster || flags.mod) {
+                if (command === "quiz" || command === "bet") {
+                    if (!message || message.trim() === "") {
+                        document.getElementById('question-box').innerHTML = `<div style="color: #ff4444;">エラー: 問題文を入力してください</div>`;
+                        return;
+                    }
+                    gameMode = command; totalPool = 0; startNewGame(message);
+                }
+// 修正後
+if (command === "answer" && currentQuestionText) {
+    // 入力された文字（message）が "1", "2", "3", "4" のいずれかであるかチェック
+    if (["1", "2", "3", "4"].includes(message.trim())) {
+        if(closeTimerInterval) clearInterval(closeTimerInterval); 
+        endGame(message.trim()); 
+    } else {
+        // 1〜4以外が入力された場合は何もしない（または配信者向けに警告を出すならここ）
+        console.log("正解番号は 1〜4 で指定してください。");
+    }
+}
+                if (command === "close") startCloseTimer(parseInt(message) || 30);
+if (command === "point") {
+                    const parts = message.trim().split(/\s+/);
+                    const amount = parseInt(parts[0]);
+                    if (!isNaN(amount)) {
+                        const target = parts[1] ? parts[1].toLowerCase() : null;
+                        
+                        if (target) {
+                            // ユーザー名の指定がある場合：その人のスコアを増減（従来通り）
+                            scores[target] = (scores[target] || 0) + amount;
+                        } else if (quizActive && gameMode === "quiz") {
+                            // ユーザー名がなく、クイズ出題中の場合：その回の正解ポイントを上書き
+                            currentQuizPoints = amount;
+                            // 画面上の表示（Quiz (100pt) など）を更新
+                            updateStatusDisplay();
+                        } else {
+                            // それ以外（全員配布など、これまでの挙動を残す場合はここ）
+                            Object.keys(participants).forEach(id => scores[id] = (scores[id] || 0) + amount);
+                        }
+                        updateScoreBoard();
+                    }
+                }
+            }
+            if (quizActive && ["1", "2", "3", "4"].includes(command)) {
+                let isDefault = false, val = parseInt(message.trim());
+                if (isNaN(val) || val <= 0) { val = CONFIG.DEFAULT_BET; isDefault = true; }
+                spawnOrMoveCat(user, command, val, isDefault);
+            }
+        };
+
+        function startNewGame(text) {
+            if (closeTimerInterval) clearInterval(closeTimerInterval);
+            
+            // 修正箇所：quizActive（出題中）だった場合のみ、賭け金を返金する
+            if (quizActive) {
+                Object.keys(participants).forEach(id => { 
+                    if (participants[id].betAmount > 0) {
+                        scores[id] = (scores[id] || 0) + participants[id].betAmount;
+                    }
+                });
+            }
+
+            // 前回のゲームの猫を画面から消去
+            Object.keys(participants).forEach(id => {
+                if (participants[id].el) participants[id].el.remove();
+            });
+
+            participants = {}; 
+            quizActive = true; 
+            currentQuestionText = text;
+            updateStatusDisplay(); 
+            updateScoreBoard();
+        }
+
+        function updateStatusDisplay(footerHtml = "") {
+            const modeName = gameMode === "quiz" ? `Quiz (${currentQuizPoints}pt)` : `Bet (Pool: ${totalPool})`;
+            document.getElementById('question-box').innerHTML = `<div style="font-size:0.7em; color:#aaa;">[${modeName}]</div><div>Q: ${currentQuestionText}</div>${footerHtml}`;
+        }
+
+        function spawnOrMoveCat(user, zoneId, betInput, isDefault) {
+            const userId = user.toLowerCase(), targetZone = document.getElementById('zone-' + zoneId), zoneRect = targetZone.getBoundingClientRect();
+            const nL = targetZone.offsetLeft + Math.random() * (zoneRect.width - 60), nT = targetZone.offsetTop + Math.random() * (zoneRect.height - 70);
+            if (!participants[userId]) {
+                let actB = (gameMode === "bet") ? Math.min(scores[userId] || 0, betInput) : 0;
+                scores[userId] = (scores[userId] || 0) - actB; totalPool += actB;
+                const el = createCatElement(user); el.style.left = "-100px"; el.style.top = nT + "px";
+                document.getElementById('main-area').appendChild(el);
+                participants[userId] = { el: el, zoneId: zoneId, betAmount: actB };
+                if (gameMode === "bet") el.querySelector('.bet-amount-label').innerText = `${actB}pt`;
+                setTimeout(() => { el.style.left = nL + "px"; el.style.top = nT + "px"; }, 50);
+            } else {
+                const p = participants[userId]; p.zoneId = zoneId; p.el.style.left = nL + "px"; p.el.style.top = nT + "px";
+                if (gameMode === "bet" && !isDefault) {
+                    let addB = Math.min(scores[userId] || 0, betInput);
+                    scores[userId] -= addB; p.betAmount += addB; totalPool += addB;
+                    p.el.querySelector('.bet-amount-label').innerText = `${p.betAmount}pt`;
+                }
+            }
+            updateStatusDisplay(); updateScoreBoard();
+        }
+
+        function endGame(correctAns) {
+            if (!currentQuestionText) return;
+            quizActive = false; 
+            const txt = currentQuestionText; 
+            currentQuestionText = ""; 
+
+            let winners = [], winB = 0;
+            Object.keys(participants).forEach(id => { if(participants[id].zoneId === correctAns) { winners.push(id); winB += participants[id].betAmount; } });
+            winners.forEach(id => {
+                let amt = (gameMode === "quiz") ? currentQuizPoints : Math.floor((participants[id].betAmount / winB) * totalPool);
+                scores[id] = (scores[id] || 0) + amt; participants[id].el.classList.add('happy-jump');
+            });
+            Object.keys(participants).forEach(id => { if(participants[id].zoneId !== correctAns) participants[id].el.classList.add('sink-down'); });
+            
+            const modeName = gameMode === "quiz" ? `Quiz (${currentQuizPoints}pt)` : `Bet (Pool: ${totalPool})`;
+            document.getElementById('question-box').innerHTML = `
+                <div style="font-size:0.7em; color:#aaa;">[${modeName}]</div>
+                <div>Q: ${txt}</div>
+                <div style="color: #ffee00; margin-top: 5px;">正解 [ ${correctAns} ] ${gameMode === 'bet' ? '配当 ' + totalPool + 'pt' : ''}</div>
+            `;
+            
+            updateScoreBoard();
+        }
+
+        function startCloseTimer(sec) {
+            if (!quizActive) return;
+            let tl = sec; if (closeTimerInterval) clearInterval(closeTimerInterval);
+            closeTimerInterval = setInterval(() => {
+                tl--; if (tl <= 0) { clearInterval(closeTimerInterval); quizActive = false; updateStatusDisplay(`<div style="color:#ff4444; margin-top:5px;">受付終了！</div>`); }
+                else updateStatusDisplay(`<div style="color:#ffaa00; margin-top:5px;">締切まで ${tl}秒</div>`);
+            }, 1000);
+        }
+
+        function createCatElement(u) {
+            const c = getUserColors(u), con = document.createElement('div'); con.className = 'cat-container';
+            const lb = document.createElement('div'); lb.className = 'bet-amount-label'; con.appendChild(lb);
+            const g = document.createElement('div'); g.className = 'pixel-grid';
+            for (let i = 0; i < CONFIG.CAT_SHAPE.length; i++) {
+                const px = document.createElement('div'); px.className = 'px'; const t = CONFIG.CAT_SHAPE[i];
+                if (t === "1") px.style.backgroundColor = c.main; else if (t === "2") px.style.backgroundColor = CONFIG.COLORS.EYE;
+                else if (t === "3") px.style.backgroundColor = CONFIG.COLORS.DETAIL; else if (t === "4") px.style.backgroundColor = c.dark;
+                g.appendChild(px);
+            }
+            con.appendChild(g); const nt = document.createElement('div'); nt.className = 'user-name'; nt.innerText = u; con.appendChild(nt); return con;
+        }
+
+        function updateScoreBoard() {
+            const l = document.getElementById('score-list'); l.innerHTML = "";
+            Object.entries(scores).sort((a, b) => b[1] - a[1]).slice(0, 15).forEach(([n, s]) => {
+                const d = document.createElement('div'); d.className = 'score-item'; d.innerHTML = `<span>${n}</span><span>${s}pt</span>`; l.appendChild(d);
+            });
+        }
+    </script>
+</body>
+</html>
