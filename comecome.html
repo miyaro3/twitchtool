@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Physics Bubble - Debug Click Version</title>
+    <script src="https://cdn.jsdelivr.net/npm/comfy.js@latest/dist/comfy.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+    <style>
+        body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; background: transparent; }
+        #canvas-container { width: 100%; height: 100%; position: relative; }
+        
+        .comment-label {
+            position: absolute;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            line-height: 1.2;
+            font-weight: bold;
+            font-family: "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,1);
+            pointer-events: none;
+            user-select: none;
+            will-change: transform;
+            z-index: 100;
+        }
+
+        .bubble {
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(4px);
+            text-align: center;
+            padding: 20px 30px; 
+        }
+
+        .popped { border: none; background: none; backdrop-filter: none; }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+    <script>
+        // ==========================================
+        // 設定パラメータ
+        // ==========================================
+        const CONFIG = {
+            fontSize: 24,
+            maxWidth: 300,
+            borderRadius: 50,
+            floatTime: 5000,
+            stayTime: 5000,
+            swayRange: [10, 30],
+            swaySpeed: [0.002, 0.005],
+            driftSpeed: [-2, 2],
+            gravity: 1.0,
+            restitution: 0.2,
+            frictionAir: 0.01,
+            spawnHeight: [0.3, 0.7]
+        };
+
+        // ==========================================
+        // 物理エンジン初期化
+        // ==========================================
+        const { Engine, Runner, Bodies, Composite, Body, Events } = Matter;
+        const params = new URLSearchParams(window.location.search);
+        const channel = params.get('channel');
+        
+        const engine = Engine.create();
+        engine.gravity.y = CONFIG.gravity;
+
+        const container = document.getElementById('canvas-container');
+        const runner = Runner.create();
+        Runner.run(runner, engine);
+
+        const ground = Bodies.rectangle(window.innerWidth / 2, window.innerHeight + 25, 5000, 50, { 
+            isStatic: true,
+            label: 'ground' 
+        });
+        Composite.add(engine.world, ground);
+
+        Events.on(engine, 'collisionStart', (event) => {
+            event.pairs.forEach((pair) => {
+                const { bodyA, bodyB } = pair;
+                if (bodyA.isFloating && bodyB.label !== 'ground') popBubble(bodyA);
+                if (bodyB.isFloating && bodyA.label !== 'ground') popBubble(bodyB);
+            });
+        });
+
+        function popBubble(box) {
+            if (!box || !box.isFloating) return;
+            box.isFloating = false;
+            Body.setVelocity(box, { x: box.velocity.x * 0.5, y: 0 });
+            if (box.domElement) {
+                box.domElement.classList.remove('bubble');
+                box.domElement.classList.add('popped');
+            }
+            checkIfSettled(box, box.domElement);
+        }
+
+        // ==========================================
+        // デバッグ用：クリックイベント
+        // ==========================================
+        window.addEventListener('mousedown', (e) => {
+            // ランダムな1〜50文字の文字列を生成
+            const chars = "あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをん！？";
+            const length = Math.floor(Math.random() * 50) + 1;
+            let randomText = "";
+            for(let i=0; i<length; i++) {
+                randomText += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            // クリックした位置(e.clientX, e.clientY)に生成
+            createBubbleComment(randomText, e.clientX, e.clientY);
+        });
+
+        ComfyJS.onChat = (user, message, flags, self, extra) => {
+            if (message.startsWith('!')) return;
+            createBubbleComment(message);
+        };
+
+        function createBubbleComment(text, customX = null, customY = null) {
+            const el = document.createElement('div');
+            el.className = 'comment-label bubble';
+            el.innerText = text;
+            el.style.fontSize = CONFIG.fontSize + "px";
+            el.style.maxWidth = CONFIG.maxWidth + "px";
+            el.style.borderRadius = CONFIG.borderRadius + "px";
+            container.appendChild(el);
+
+            const width = el.offsetWidth;
+            const height = el.offsetHeight;
+
+            // X座標の決定（カスタム値がなければランダム）
+            const startX = customX !== null ? customX : Math.random() * (window.innerWidth - width) + width / 2;
+            // Y座標の決定（カスタム値がなければCONFIGの範囲）
+            const startY = customY !== null ? customY : (window.innerHeight * CONFIG.spawnHeight[0]) + 
+                           (Math.random() * window.innerHeight * (CONFIG.spawnHeight[1] - CONFIG.spawnHeight[0]));
+
+            const box = Bodies.rectangle(startX, startY, width, height, {
+                restitution: CONFIG.restitution,
+                frictionAir: CONFIG.frictionAir,
+                chamfer: { radius: Math.min(height/2, CONFIG.borderRadius) }
+            });
+
+            box.isFloating = true;
+            box.domElement = el;
+            box.baseY = startY;
+            box.swayOffset = Math.random() * Math.PI * 2;
+            box.swaySpeed = CONFIG.swaySpeed[0] + Math.random() * (CONFIG.swaySpeed[1] - CONFIG.swaySpeed[0]);
+            box.swayAmplitude = CONFIG.swayRange[0] + Math.random() * (CONFIG.swayRange[1] - CONFIG.swayRange[0]);
+
+            const randomDrift = CONFIG.driftSpeed[0] + Math.random() * (CONFIG.driftSpeed[1] - CONFIG.driftSpeed[0]);
+            Body.setVelocity(box, { x: randomDrift, y: 0 });
+
+            Composite.add(engine.world, box);
+
+            setTimeout(() => popBubble(box), CONFIG.floatTime);
+
+            Events.on(engine, 'beforeUpdate', () => {
+                if (box.isFloating) {
+                    Body.setVelocity(box, { x: box.velocity.x, y: 0 });
+                    const time = Date.now();
+                    const nextY = box.baseY + Math.sin(time * box.swaySpeed + box.swayOffset) * box.swayAmplitude;
+                    Body.setPosition(box, { x: box.position.x, y: nextY });
+                }
+            });
+
+            Events.on(engine, 'afterUpdate', () => {
+                el.style.transform = `translate(${box.position.x - width / 2}px, ${box.position.y - height / 2}px) rotate(${box.angle}rad)`;
+                if (box.position.y > window.innerHeight + 500 || Math.abs(box.position.x) > window.innerWidth + 800) {
+                    removeBody(box, el);
+                }
+            });
+        }
+
+        function checkIfSettled(box, el) {
+            const checkInterval = setInterval(() => {
+                if (box && !box.isFloating && box.position.y > window.innerHeight * 0.5 && Math.abs(box.velocity.y) < 0.2) {
+                    clearInterval(checkInterval);
+                    setTimeout(() => {
+                        if (el) {
+                            el.style.transition = 'opacity 1s';
+                            el.style.opacity = '0';
+                            setTimeout(() => removeBody(box, el), 1000);
+                        }
+                    }, CONFIG.stayTime);
+                }
+            }, 500);
+        }
+
+        function removeBody(box, el) {
+            if (box) Composite.remove(engine.world, box);
+            if (el && el.parentNode) el.remove();
+        }
+
+        if (channel) ComfyJS.Init(channel);
+    </script>
+</body>
+</html>
