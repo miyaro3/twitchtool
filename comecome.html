@@ -29,7 +29,7 @@
             background: rgba(255, 255, 255, 0.15);
             backdrop-filter: blur(4px);
             text-align: center;
-            padding: 20px 30px; 
+            padding: 5px 10px; 
         }
 
         .popped { border: none; background: none; backdrop-filter: none; }
@@ -41,20 +41,28 @@
         // ==========================================
         // 設定パラメータ
         // ==========================================
-        const CONFIG = {
-            fontSize: 24,
-            maxWidth: 300,
-            borderRadius: 50,
-            floatTime: 5000,
-            stayTime: 5000,
-            swayRange: [10, 30],
-            swaySpeed: [0.002, 0.005],
-            driftSpeed: [-2, 2],
-            gravity: 1.0,
-            restitution: 0.2,
-            frictionAir: 0.01,
-            spawnHeight: [0.3, 0.7]
-        };
+const CONFIG = {
+    fontSize: 24,           // フォントサイズ（px）
+    maxWidth: 300,          // コメントの最大横幅。これを超えると自動改行されます
+    borderRadius: 50,       // 泡の角の丸み。大きくするとより円形に近づきます
+    floatTime: 5000,        // 泡が浮いている時間（ミリ秒）。5秒後に「パチン」と割れて落下します
+    stayTime: 5000,         // 地面に落ちた後、消えるまでの待機時間（ミリ秒）
+    
+    // 浮遊時の揺れ設定
+    swayRange: [10, 30],    // 上下揺れの振幅（最小10px 〜 最大30pxの範囲でランダム）
+    swaySpeed: [0.002, 0.005], // 上下揺れの速さ
+    
+    // 横方向の動き
+    driftSpeed: [-2, 2],    // 出現時の横移動速度（マイナスは左、プラスは右へ流れる）
+    
+    // 物理演算
+    gravity: 1.0,           // 重力の強さ。割れた後の落下速度に影響します
+    restitution: 0.2,       // 跳ね返り係数。地面に落ちた時にどれくらい弾むか（0〜1）
+    frictionAir: 0.01,      // 空気抵抗。落ちる時の「ふわっと感」を調整
+    
+    // 出現位置
+    spawnHeight: [0.3, 0.7] // 画面上端を0、下端を1とした時、どの高さの範囲に出現するか
+};
 
         // ==========================================
         // 物理エンジン初期化
