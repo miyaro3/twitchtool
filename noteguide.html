@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>Multi-Box News System - Setup Guide</title>
+    <title>Multi-Box note System - Setup Guide</title>
     <style>
         body { font-family: 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #e0e0e0; background: #121212; margin: 0; padding: 40px 20px; }
         .container { max-width: 900px; margin: 0 auto; background: #1e1e1e; padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
@@ -32,43 +32,43 @@
 <body>
 
 <div class="container">
-    <h1>Multi-Box News Setup Guide</h1>
+    <h1>Multi-Box note Setup Guide</h1>
 
     <div class="setup-section">
         <h3>1. レイアウトを作成する</h3>
         <p>まずはエディタでボックスの配置、フォント、色、コマンド名を決定してください。</p>
-        <a href="newssetup.html" class="btn-link">エディタ（設定ページ）を開く</a>
+        <a href="notesetup.html" class="btn-link">エディタ（設定ページ）を開く</a>
     </div>
 
     <h2>Twitchチャットコマンド</h2>
-    <p>設定したコマンド（例：<code>!news1</code>）に続けて、以下のサブコマンドを入力して操作します。</p>
+    <p>設定したコマンド（例：<code>!note1</code>）に続けて、以下のサブコマンドを入力して操作します。</p>
     
     <h3>テキスト操作</h3>
     <table class="command-table">
         <tr><th>コマンド名</th><th>内容</th></tr>
-        <tr><td><code>!news1 set [文字]</code></td><td>内容を書き換えます。<code>\n</code>で改行可能です。</td></tr>
-        <tr><td><code>!news1 add [文字]</code></td><td>一番上の行に新しく追加します。</td></tr>
-        <tr><td><code>!news1 addl [文字]</code></td><td>一番下の行に新しく追加します。</td></tr>
-        <tr><td><code>!news1 del</code></td><td>一番上の行を削除します。</td></tr>
-        <tr><td><code>!news1 dell</code></td><td>一番下の行を削除します。</td></tr>
-        <tr><td><code>!news1 clear</code></td><td>全ての文字を消去し、ボックスを非表示にします。</td></tr>
+        <tr><td><code>!note1 set [文字]</code></td><td>内容を書き換えます。<code>\n</code>で改行可能です。</td></tr>
+        <tr><td><code>!note1 add [文字]</code></td><td>一番上の行に新しく追加します。</td></tr>
+        <tr><td><code>!note1 addl [文字]</code></td><td>一番下の行に新しく追加します。</td></tr>
+        <tr><td><code>!note1 del</code></td><td>一番上の行を削除します。</td></tr>
+        <tr><td><code>!note1 dell</code></td><td>一番下の行を削除します。</td></tr>
+        <tr><td><code>!note1 clear</code></td><td>全ての文字を消去し、ボックスを非表示にします。</td></tr>
     </table>
 
     <h3>表示・特殊機能</h3>
     <table class="command-table">
         <tr><th>コマンド名</th><th>内容</th></tr>
-        <tr><td><code>!news1 hide</code></td><td>内容を保持したまま、ボックスを隠します。</td></tr>
-        <tr><td><code>!news1 show</code></td><td>隠したボックスを再表示します。</td></tr>
-        <tr><td><code>!news1 font [番号]</code></td><td>フォントを即座に変更します（1〜25番）。</td></tr>
-        <tr><td><code>!news1 color [色]</code></td><td>文字色を変更します（例：red, #ff00ff）。</td></tr>
+        <tr><td><code>!note1 hide</code></td><td>内容を保持したまま、ボックスを隠します。</td></tr>
+        <tr><td><code>!note1 show</code></td><td>隠したボックスを再表示します。</td></tr>
+        <tr><td><code>!note1 font [番号]</code></td><td>フォントを即座に変更します（1〜25番）。</td></tr>
+        <tr><td><code>!note1 color [色]</code></td><td>文字色を変更します（例：red, #ff00ff）。</td></tr>
     </table>
 
     <h3>時計・タイマー</h3>
     <table class="command-table">
         <tr><th>コマンド名</th><th>内容</th></tr>
-        <tr><td><code>!news1 clock</code></td><td>現在時刻を表示し続けます。</td></tr>
-        <tr><td><code>!news1 countdown [時間]</code></td><td>カウントダウン。<code>ss</code> / <code>mm:ss</code> / <code>hh:mm:ss</code>形式に対応。</td></tr>
-        <tr><td><code>!news1 countup</code></td><td>00:00:00からカウントアップを開始します。</td></tr>
+        <tr><td><code>!note1 clock</code></td><td>現在時刻を表示し続けます。</td></tr>
+        <tr><td><code>!note1 countdown [時間]</code></td><td>カウントダウン。<code>ss</code> / <code>mm:ss</code> / <code>hh:mm:ss</code>形式に対応。</td></tr>
+        <tr><td><code>!note1 countup</code></td><td>00:00:00からカウントアップを開始します。</td></tr>
     </table>
 
     <h2>OBS 推奨設定</h2>

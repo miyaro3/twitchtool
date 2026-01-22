@@ -46,7 +46,7 @@
             <textarea id="p-preview" rows="2" oninput="sync()"></textarea>
 
             <span class="label">Twitch Command (!なし)</span>
-            <input type="text" id="p-cmd" oninput="sync()" placeholder="news1">
+            <input type="text" id="p-cmd" oninput="sync()" placeholder="note1">
             
             <div class="flex-row">
                 <div><span class="label">Font Family</span>
@@ -153,7 +153,7 @@
 
     function addBox() {
         if (boxes.length >= 5) return; const id = 'b' + Date.now();
-        boxes.push({ id, x: 50, y: 50, w: 400, h: 80, cmd: 'news' + (boxes.length + 1), preview: 'サンプルテキスト', size: 32, color: '#ffffff', colorA: 1.0, bg: '#000000', bgA: 0.7, font: "'Noto Sans JP', sans-serif", alignH: 'left', alignV: 'center', outlineC: '#000000', outlineW: 2, scroll: false, speed: 100, loop: true });
+        boxes.push({ id, x: 50, y: 50, w: 400, h: 80, cmd: 'note' + (boxes.length + 1), preview: 'サンプルテキスト', size: 32, color: '#ffffff', colorA: 1.0, bg: '#000000', bgA: 0.7, font: "'Noto Sans JP', sans-serif", alignH: 'left', alignV: 'center', outlineC: '#000000', outlineW: 2, scroll: false, speed: 100, loop: true });
         select(id); render();
     }
 
@@ -222,7 +222,7 @@
     // -------------------------
         const data = boxes.map(b => ({ c: b.cmd, x: b.x, y: b.y, w: b.w, h: b.h, s: b.size, cl: b.color.replace('#',''), cla: b.colorA, bg: b.bg.replace('#',''), bga: b.bgA, f: b.font, ah: b.alignH, av: b.alignV, oc: b.outlineC.replace('#',''), ow: b.outlineW, sc: b.scroll ? 1 : 0, sp: b.speed, lp: b.loop ? 1 : 0 }));
         const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
-        document.getElementById('url-out').innerText = `${window.location.origin}/news.html?channel=${ch}&data=${encoded}`;
+        document.getElementById('url-out').innerText = `${window.location.origin}/note.html?channel=${ch}&data=${encoded}`;
     }
     function copyURL() {
     const ch = document.getElementById('g-channel').value.trim();
