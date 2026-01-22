@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@700&family=Sawarabi+Gothic&family=Zen+Kaku+Gothic+New:wght@700&family=M+PLUS+1p:wght@700&family=BIZ+UDPGothic:wght@700&family=Kosugi&family=M+PLUS+Rounded+1c:wght@700&family=Zen+Maru+Gothic:wght@700&family=Kiwi+Maru:wght@500&family=Kosugi+Maru&family=Noto+Serif+JP:wght@700&family=Zen+Old+Mincho:wght@700&family=Shippori+Mincho:wght@700&family=Sawarabi+Mincho&family=Hina+Mincho&family=Kaisei+Decol:wght@700&family=Kaisei+Opti:wght@700&family=Dela+Gothic+One&family=Mochiy+Pop+One&family=Aoboshi+One&family=Zen+Kurenaido&family=Klee+One:wght@600&family=Yomogi&family=Yusei+Magic&family=DotGothic16&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/comfy.js@latest/dist/comfy.min.js"></script>
+    <style>
+        body { margin: 0; width: 896px; height: 504px; overflow: hidden; background: transparent; }
+        .box { position: absolute; display: flex; overflow: hidden; box-sizing: border-box; }
+        .inner { display: inline-block; white-space: pre-wrap; width: 100%; position: relative; line-height: 1.3; font-weight: bold; }
+        .scrolling .inner { white-space: nowrap; width: auto; padding-left: 100%; animation: scroll-anim var(--dur) linear; }
+        @keyframes scroll-anim { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
+    </style>
+</head>
+<body>
+<div id="container"></div>
+
+<script>
+    const params = new URLSearchParams(window.location.search);
+    const channel = params.get('channel');
+    const encodedData = params.get('data');
+    let configs = [];
+
+    const fontList = [
+        "'Noto Sans JP', sans-serif", "'Sawarabi Gothic', sans-serif", "'Zen Kaku Gothic New', sans-serif", "'M PLUS 1p', sans-serif", "'BIZ UDPGothic', sans-serif", "'Kosugi', sans-serif",
+        "'M PLUS Rounded 1c', sans-serif", "'Zen Maru Gothic', sans-serif", "'Kiwi Maru', serif", "'Kosugi Maru', sans-serif",
+        "'Noto Serif JP', serif", "'Zen Old Mincho', serif", "'Shippori Mincho', serif", "'Sawarabi Mincho', serif", "'Hina Mincho', serif",
+        "'Kaisei Decol', serif", "'Kaisei Opti', serif", "'Dela Gothic One', sans-serif", "'Mochiy Pop One', sans-serif", "'Aoboshi One', serif", "'DotGothic16', sans-serif",
+        "'Zen Kurenaido', sans-serif", "'Klee One', sans-serif", "'Yomogi', sans-serif", "'Yusei Magic', sans-serif"
+    ];
+
+    if (encodedData) {
+        configs = JSON.parse(decodeURIComponent(escape(atob(encodedData))));
+        const container = document.getElementById('container');
+        configs.forEach((conf, idx) => {
+            const el = document.createElement('div');
+            el.id = `box-${idx}`;
+            el.className = `box ${conf.sc ? 'scrolling' : ''}`;
+            
+            let shadow = genShadow(conf.ow, conf.oc);
+            const jH = conf.ah === 'center' ? 'center' : (conf.ah === 'right' ? 'flex-end' : 'flex-start');
+            const jV = conf.av === 'center' ? 'center' : (conf.av === 'end' ? 'flex-end' : 'flex-start');
+            
+            el.style.cssText = `left:${conf.x}px; top:${conf.y}px; width:${conf.w}px; height:${conf.h}px; font-family:${conf.f}; font-size:${conf.s}px; color:rgba(${hexToRgb(conf.cl)},${conf.cla}); background:rgba(${hexToRgb(conf.bg)},${conf.bga}); text-shadow:${shadow}; justify-content:${jH}; align-items:${jV}; display:none;`;
+            
+            const inner = document.createElement('div');
+            inner.className = 'inner';
+            inner.style.textAlign = conf.ah;
+            el.appendChild(inner);
+            container.appendChild(el);
+            
+            conf.el = el;
+            conf.inner = inner;
+            conf.timerId = null;
+            conf.defaultColor = `rgba(${hexToRgb(conf.cl)},${conf.cla})`;
+
+            // --- ローカルストレージからの復元処理 ---
+            const savedData = localStorage.getItem(`boxState_${idx}`);
+            if (savedData) {
+                const state = JSON.parse(savedData);
+                conf.inner.innerText = state.text;
+                conf.el.style.display = state.display;
+                conf.el.style.color = state.color;
+                // フォント情報はURLパラメータ(conf.f)を優先するため復元しない
+
+                conf.mode = state.mode;
+                if (state.mode === 'clock') {
+                    runClock(conf, false);
+                } else if (state.mode === 'clockss') {
+                    runClock(conf, true);
+                } else if (state.mode === 'countdown' && state.endTime) {
+                    const remain = state.endTime - Math.floor(Date.now() / 1000);
+                    if (remain > 0) runCountdown(conf, remain);
+                } else if (state.mode === 'countup' && state.startTime) {
+                    const elapsed = Math.floor(Date.now() / 1000) - state.startTime;
+                    runCountup(conf, elapsed);
+                } else if (state.text !== "") {
+                    updateView(conf);
+                }
+            }
+        });
+    }
+
+    function saveBoxState(conf) {
+        const idx = configs.indexOf(conf);
+        const state = {
+            text: conf.inner.innerText,
+            display: conf.el.style.display,
+            color: conf.el.style.color,
+            mode: conf.mode || 'text',
+            endTime: conf.endTime || null,
+            startTime: conf.startTime || null
+        };
+        localStorage.setItem(`boxState_${idx}`, JSON.stringify(state));
+    }
+
+    function genShadow(w, c) {
+        let s = ""; if(w <= 0) return "none";
+        for(let i=-w; i<=w; i++) { for(let j=-w; j<=w; j++) { if(i===0 && j===0) continue; s += `${i}px ${j}px 0 #${c},`; } }
+        return s.slice(0, -1);
+    }
+
+    function hexToRgb(hex) {
+        const r = parseInt(hex.slice(0,2), 16), g = parseInt(hex.slice(2,4), 16), b = parseInt(hex.slice(4,6), 16);
+        return `${r},${g},${b}`;
+    }
+
+    function updateView(conf, text) {
+        clearInterval(conf.timerId);
+        if (text !== undefined) conf.inner.innerText = text;
+        if (conf.inner.innerText === "") {
+            conf.el.style.display = 'none';
+            return;
+        }
+        conf.el.style.display = 'flex';
+
+        if (conf.sc) {
+            conf.inner.style.animation = 'none';
+            conf.inner.offsetHeight; // リフロー
+            const dur = (conf.w + conf.inner.offsetWidth) / (conf.sp || 50);
+            conf.inner.style.setProperty('--dur', `${dur}s`);
+            conf.inner.style.animation = `scroll-anim ${dur}s linear ${conf.lp ? 'infinite' : '1'}`;
+
+            // --- 追記：ループ無しの場合の終了処理 ---
+            if (!conf.lp) {
+                // 既存のリスナーがあれば削除（重複防止）
+                conf.inner.onanimationend = null;
+                // アニメーション終了時のイベント
+                conf.inner.onanimationend = () => {
+                    updateView(conf, ""); // 内容をクリア
+                    conf.mode = 'text';   // モードリセット
+                    saveBoxState(conf);   // ストレージ保存（背景も消える）
+                };
+            } else {
+                conf.inner.onanimationend = null;
+            }
+        }
+    }
+
+    function parseTime(str) {
+        const parts = str.split(':').map(Number);
+        if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+        if (parts.length === 2) return parts[0] * 60 + parts[1];
+        return parts[0] || 0;
+    }
+
+    function formatTime(sec) {
+        const h = Math.floor(sec / 3600).toString().padStart(2, '0');
+        const m = Math.floor((sec % 3600) / 60).toString().padStart(2, '0');
+        const s = (sec % 60).toString().padStart(2, '0');
+        return `${h}:${m}:${s}`;
+    }
+
+    // --- タイマー制御用共通関数 ---
+    function runClock(conf, showSec) {
+        clearInterval(conf.timerId);
+        updateView(conf, showSec ? "00:00:00" : "00:00");
+        const options = { hour: '2-digit', minute: '2-digit', hour12: false };
+        if (showSec) options.second = '2-digit';
+        
+        conf.timerId = setInterval(() => {
+            conf.inner.innerText = new Date().toLocaleTimeString('ja-JP', options);
+        }, 1000);
+    }
+
+    function runCountdown(conf, sec) {
+        clearInterval(conf.timerId);
+        conf.endTime = Math.floor(Date.now() / 1000) + sec;
+        updateView(conf, formatTime(sec));
+        conf.timerId = setInterval(() => {
+            const remain = conf.endTime - Math.floor(Date.now() / 1000);
+            if (remain <= 0) { 
+                conf.inner.innerText = formatTime(0);
+                clearInterval(conf.timerId); 
+                return; 
+            }
+            conf.inner.innerText = formatTime(remain);
+        }, 1000);
+    }
+
+    function runCountup(conf, startElapsed = 0) {
+        clearInterval(conf.timerId);
+        conf.startTime = Math.floor(Date.now() / 1000) - startElapsed;
+        updateView(conf, formatTime(startElapsed));
+        conf.timerId = setInterval(() => {
+            const elapsed = Math.floor(Date.now() / 1000) - conf.startTime;
+            conf.inner.innerText = formatTime(elapsed);
+        }, 1000);
+    }
+
+    ComfyJS.onCommand = (user, command, message, flags) => {
+        if (!flags.broadcaster && !flags.moderator) return;
+
+        // 一括操作コマンド
+        if (command === "resetnote") {
+            localStorage.clear();
+            location.reload();
+            return;
+        }
+        if (command === "allnoteclear") {
+            configs.forEach(c => {
+                updateView(c, "");
+                c.mode = 'text';
+                saveBoxState(c);
+            });
+            return;
+        }
+
+        configs.forEach(conf => {
+            if (command === conf.c) {
+                const processedMessage = message.replace(/\\n/g, '\n');
+                const args = processedMessage.split(' ');
+                const subCmd = args[0];
+                const content = args.slice(1).join(' ');
+                let lines = conf.inner.innerText.split('\n').filter(l => l !== "");
+
+                switch (subCmd) {
+                    case 'set': 
+                        conf.mode = 'text';
+                        updateView(conf, content); 
+                        saveBoxState(conf); 
+                        break;
+                    case 'add': 
+                        conf.mode = 'text';
+                        lines.unshift(content); 
+                        updateView(conf, lines.join('\n')); 
+                        saveBoxState(conf); 
+                        break;
+                    case 'addl': 
+                        conf.mode = 'text';
+                        lines.push(content); 
+                        updateView(conf, lines.join('\n')); 
+                        saveBoxState(conf); 
+                        break;
+                    case 'del': 
+                        lines.shift(); 
+                        updateView(conf, lines.join('\n')); 
+                        saveBoxState(conf); 
+                        break;
+                    case 'dell': 
+                        lines.pop(); 
+                        updateView(conf, lines.join('\n')); 
+                        saveBoxState(conf); 
+                        break;
+                    case 'clear': 
+                        updateView(conf, ""); 
+                        conf.mode = 'text';
+                        saveBoxState(conf); 
+                        break;
+                    case 'show': 
+                        conf.el.style.display = 'flex'; 
+                        saveBoxState(conf); 
+                        break;
+                    case 'hide': 
+                        conf.el.style.display = 'none'; 
+                        saveBoxState(conf); 
+                        break;
+                    case 'color': 
+                        conf.el.style.color = content; 
+                        saveBoxState(conf); 
+                        break;
+                    case 'font': 
+                        const fIdx = parseInt(content) - 1;
+                        if(fontList[fIdx]) { 
+                            conf.el.style.fontFamily = fontList[fIdx]; 
+                            updateView(conf); 
+                            // フォントは保存しない仕様
+                        }
+                        break;
+                    case 'clock':
+                        conf.mode = 'clock';
+                        runClock(conf, false);
+                        saveBoxState(conf);
+                        break;
+                    case 'clockss':
+                        conf.mode = 'clockss';
+                        runClock(conf, true);
+                        saveBoxState(conf);
+                        break;
+                    case 'countdown':
+                        conf.mode = 'countdown';
+                        runCountdown(conf, parseTime(content));
+                        saveBoxState(conf);
+                        break;
+                    case 'countup':
+                        conf.mode = 'countup';
+                        runCountup(conf, 0);
+                        saveBoxState(conf);
+                        break;
+                }
+            }
+        });
+    };
+    if (channel) ComfyJS.Init(channel);
+</script>
+</body>
+</html>

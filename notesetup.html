@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>OBS Multi-Box Editor - Full Version</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@700&family=Sawarabi+Gothic&family=Zen+Kaku+Gothic+New:wght@700&family=M+PLUS+1p:wght@700&family=BIZ+UDPGothic:wght@700&family=Kosugi&family=M+PLUS+Rounded+1c:wght@700&family=Zen+Maru+Gothic:wght@700&family=Kiwi+Maru:wght@500&family=Kosugi+Maru&family=Noto+Serif+JP:wght@700&family=Zen+Old+Mincho:wght@700&family=Shippori+Mincho:wght@700&family=Sawarabi+Mincho&family=Hina+Mincho&family=Kaisei+Decol:wght@700&family=Kaisei+Opti:wght@700&family=Dela+Gothic+One&family=Mochiy+Pop+One&family=Aoboshi+One&family=Zen+Kurenaido&family=Klee+One:wght@600&family=Yomogi&family=Yusei+Magic&family=DotGothic16&display=swap" rel="stylesheet">
+    
+    <style>
+        :root { --p: #9146FF; --bg: #0e0e10; --panel: #18181b; --accent: #00f2ff; }
+        body { font-family: 'Segoe UI', sans-serif; display: flex; height: 100vh; margin: 0; background: var(--bg); color: #efeff1; overflow: hidden; }
+        #sidebar { width: 380px; background: var(--panel); border-right: 1px solid #303032; display: flex; flex-direction: column; z-index: 100; }
+        .header { padding: 15px; background: var(--p); font-weight: bold; text-align: center; }
+        .scroll-area { flex-grow: 1; overflow-y: auto; padding: 15px; }
+        .section { margin-bottom: 15px; padding: 12px; background: #26262c; border-radius: 6px; border: 1px solid #333; }
+        .label { font-size: 11px; color: #adadb8; margin: 8px 0 4px; display: block; text-transform: uppercase; }
+        input, select, textarea { width: 100%; padding: 8px; margin-bottom: 8px; background: #3a3a3d; border: 1px solid #464649; color: white; border-radius: 4px; box-sizing: border-box; font-size: 13px; }
+        .flex-row { display: flex; gap: 8px; }
+        .flex-row > div { flex: 1; }
+        #main { flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #222; }
+        #canvas-wrap { position: relative; border: 4px solid #000; background: #000; width: 896px; height: 504px; box-shadow: 0 0 30px rgba(0,0,0,0.5); }
+        #canvas-bg { position: absolute; top:0; left:0; width:100%; height:100%; background-size: contain; background-repeat: no-repeat; background-position: center; pointer-events: none; opacity: 0.7; }
+        #canvas { position: absolute; top:0; left:0; width: 100%; height: 100%; overflow: hidden; }
+        .box { position: absolute; border: 1px dashed var(--accent); cursor: move; box-sizing: border-box; display: flex; overflow: hidden; }
+        .box.active { border: 2px solid #ff00ff; z-index: 10; }
+        .resizer { width: 16px; height: 16px; background: white; border: 2px solid #333; position: absolute; right: -8px; bottom: -8px; cursor: nwse-resize; border-radius: 50%; z-index: 20; }
+        .inner-text { display: inline-block; white-space: pre-wrap; width: 100%; position: relative; line-height: 1.3; font-weight: bold; }
+        .scrolling .inner-text { white-space: nowrap; width: auto; padding-left: 100%; animation: scroll-preview var(--dur) linear infinite; }
+        @keyframes scroll-preview { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
+        #url-out { background: #000; padding: 10px; font-size: 10px; word-break: break-all; border: 1px solid #444; color: #00ff00; font-family: monospace; min-height: 40px; margin-top: 10px; }
+        .btn { background: var(--p); border: none; color: white; padding: 10px; width: 100%; cursor: pointer; border-radius: 4px; font-weight: bold; margin: 5px 0; }
+        optgroup { background: #18181b; color: #00f2ff; font-style: normal; }
+    </style>
+</head>
+<body>
+
+<div id="sidebar">
+    <div class="header">OBS LAYOUT EDITOR</div>
+    <div class="scroll-area">
+        <div class="section">
+            <span class="label">背景ガイド (配信SSなど)</span>
+            <input type="file" id="bg-upload" accept="image/*">
+        </div>
+
+        <div id="props" style="display:none;" class="section">
+            <span class="label">Preview Text (改行可)</span>
+            <textarea id="p-preview" rows="2" oninput="sync()"></textarea>
+
+            <span class="label">Twitch Command (!なし)</span>
+            <input type="text" id="p-cmd" oninput="sync()" placeholder="news1">
+            
+            <div class="flex-row">
+                <div><span class="label">Font Family</span>
+                    <select id="p-font" onchange="sync()">
+                        <optgroup label="ゴシック体">
+                            <option value="'Noto Sans JP', sans-serif">Noto Sans JP</option>
+                            <option value="'Sawarabi Gothic', sans-serif">Sawarabi Gothic</option>
+                            <option value="'Zen Kaku Gothic New', sans-serif">Zen Kaku Gothic New</option>
+                            <option value="'M PLUS 1p', sans-serif">M PLUS 1p</option>
+                            <option value="'BIZ UDPGothic', sans-serif">BIZ UDPGothic</option>
+                            <option value="'Kosugi', sans-serif">Kosugi</option>
+                        </optgroup>
+                        <optgroup label="丸ゴシック体">
+                            <option value="'M PLUS Rounded 1c', sans-serif">M PLUS Rounded 1c</option>
+                            <option value="'Zen Maru Gothic', sans-serif">Zen Maru Gothic</option>
+                            <option value="'Kiwi Maru', serif">Kiwi Maru</option>
+                            <option value="'Kosugi Maru', sans-serif">Kosugi Maru</option>
+                        </optgroup>
+                        <optgroup label="明朝体">
+                            <option value="'Noto Serif JP', serif">Noto Serif JP</option>
+                            <option value="'Zen Old Mincho', serif">Zen Old Mincho</option>
+                            <option value="'Shippori Mincho', serif">Shippori Mincho</option>
+                            <option value="'Sawarabi Mincho', serif">Sawarabi Mincho</option>
+                            <option value="'Hina Mincho', serif">Hina Mincho</option>
+                        </optgroup>
+                        <optgroup label="デザイン書体">
+                            <option value="'Kaisei Decol', serif">Kaisei Decol</option>
+                            <option value="'Kaisei Opti', serif">Kaisei Opti</option>
+                            <option value="'Dela Gothic One', sans-serif">Dela Gothic One</option>
+                            <option value="'Mochiy Pop One', sans-serif">Mochiy Pop One</option>
+                            <option value="'Aoboshi One', serif">Aoboshi One</option>
+                            <option value="'DotGothic16', sans-serif">DotGothic16</option>
+                        </optgroup>
+                        <optgroup label="手書き風">
+                            <option value="'Zen Kurenaido', sans-serif">Zen Kurenaido</option>
+                            <option value="'Klee One', sans-serif">Klee One</option>
+                            <option value="'Yomogi', sans-serif">Yomogi</option>
+                            <option value="'Yusei Magic', sans-serif">Yusei Magic</option>
+                        </optgroup>
+                    </select>
+                </div>
+                <div><span class="label">Size</span><input type="number" id="p-size" oninput="sync()"></div>
+            </div>
+
+            <span class="label">Align (水平 / 垂直)</span>
+            <div class="flex-row">
+                <select id="p-align-h" onchange="sync()"><option value="left">左寄せ</option><option value="center">中央</option><option value="right">右寄せ</option></select>
+                <select id="p-align-v" onchange="sync()"><option value="start">上寄せ</option><option value="center">中寄せ</option><option value="end">下寄せ</option></select>
+            </div>
+
+            <div class="flex-row">
+                <div><span class="label">文字色・透明度</span><div class="flex-row"><input type="color" id="p-color" oninput="sync()"><input type="range" id="p-color-a" min="0" max="1" step="0.1" oninput="sync()"></div></div>
+            </div>
+            <div class="flex-row">
+                <div><span class="label">背景色・透明度</span><div class="flex-row"><input type="color" id="p-bg" oninput="sync()"><input type="range" id="p-bg-a" min="0" max="1" step="0.1" oninput="sync()"></div></div>
+            </div>
+
+            <span class="label">Outline (太さ / 色)</span>
+            <div class="flex-row"><input type="number" id="p-outline-w" min="0" max="15" oninput="sync()"><input type="color" id="p-outline-c" oninput="sync()"></div>
+
+            <span class="label">Scroll Settings</span>
+            <div class="flex-row" style="align-items: center;">
+                <input type="checkbox" id="p-scroll" onchange="sync()"> <span class="label">有効</span>
+                <input type="checkbox" id="p-loop" onchange="sync()"> <span class="label">Loop</span>
+                <input type="number" id="p-speed" oninput="sync()" style="width:70px;" placeholder="Speed">
+            </div>
+            
+            <button class="btn" style="background:#444; margin-top:10px;" onclick="delBox()">Remove Box</button>
+        </div>
+
+        <button class="btn" onclick="addBox()">+ Add Box (Max 5)</button>
+
+        <div class="section">
+            <span class="label">Twitch Channel ID</span>
+            <input type="text" id="g-channel" oninput="genURL()" placeholder="YourChannelName">
+            <div id="channel-error" style="color: #ff4444; font-size: 12px; margin-top: -5px; margin-bottom: 10px; display: none;">
+                ※Channel IDを入力してください。
+            </div>
+            <span class="label">OBS URL</span>
+            <div id="url-out">...</div>
+            <button class="btn" onclick="copyURL()">Copy Combined URL</button>
+        </div>
+    </div>
+</div>
+
+<div id="main">
+    <div id="canvas-wrap">
+        <div id="canvas-bg"></div>
+        <div id="canvas" onclick="deselect(event)"></div>
+    </div>
+    <div style="font-size: 11px; color:#888; margin-top:10px;">Ctrl+Drag/Resizeでスナップ吸着 | 背景ガイドは保存されません</div>
+</div>
+
+<script>
+    let boxes = []; let activeId = null; const canvas = document.getElementById('canvas');
+
+    document.getElementById('bg-upload').addEventListener('change', function(e) {
+        const file = e.target.files[0]; if (file) {
+            const reader = new FileReader(); reader.onload = (f) => { document.getElementById('canvas-bg').style.backgroundImage = `url(${f.target.result})`; }; reader.readAsDataURL(file);
+        }
+    });
+
+    function hexToRgb(hex) { const r = parseInt(hex.slice(1,3), 16), g = parseInt(hex.slice(3,5), 16), b = parseInt(hex.slice(5,7), 16); return `${r},${g},${b}`; }
+
+    function addBox() {
+        if (boxes.length >= 5) return; const id = 'b' + Date.now();
+        boxes.push({ id, x: 50, y: 50, w: 400, h: 80, cmd: 'news' + (boxes.length + 1), preview: 'サンプルテキスト', size: 32, color: '#ffffff', colorA: 1.0, bg: '#000000', bgA: 0.7, font: "'Noto Sans JP', sans-serif", alignH: 'left', alignV: 'center', outlineC: '#000000', outlineW: 2, scroll: false, speed: 100, loop: true });
+        select(id); render();
+    }
+
+    function select(id) {
+        activeId = id; const b = boxes.find(x => x.id === id); document.getElementById('props').style.display = 'block';
+        document.getElementById('p-preview').value = b.preview; document.getElementById('p-cmd').value = b.cmd;
+        document.getElementById('p-size').value = b.size; document.getElementById('p-color').value = b.color; document.getElementById('p-color-a').value = b.colorA;
+        document.getElementById('p-bg').value = b.bg; document.getElementById('p-bg-a').value = b.bgA; document.getElementById('p-font').value = b.font;
+        document.getElementById('p-align-h').value = b.alignH; document.getElementById('p-align-v').value = b.alignV; document.getElementById('p-outline-c').value = b.outlineC;
+        document.getElementById('p-outline-w').value = b.outlineW; document.getElementById('p-scroll').checked = b.scroll; document.getElementById('p-loop').checked = b.loop; document.getElementById('p-speed').value = b.speed;
+        render();
+    }
+
+    function sync() {
+        if(!activeId) return; const b = boxes.find(x => x.id === activeId);
+        b.preview = document.getElementById('p-preview').value; b.cmd = document.getElementById('p-cmd').value; b.size = parseInt(document.getElementById('p-size').value) || 20;
+        b.color = document.getElementById('p-color').value; b.colorA = parseFloat(document.getElementById('p-color-a').value);
+        b.bg = document.getElementById('p-bg').value; b.bgA = parseFloat(document.getElementById('p-bg-a').value);
+        b.font = document.getElementById('p-font').value; b.alignH = document.getElementById('p-align-h').value; b.alignV = document.getElementById('p-align-v').value;
+        b.outlineC = document.getElementById('p-outline-c').value; b.outlineW = parseInt(document.getElementById('p-outline-w').value) || 0;
+        b.scroll = document.getElementById('p-scroll').checked; b.loop = document.getElementById('p-loop').checked; b.speed = parseInt(document.getElementById('p-speed').value) || 10;
+        render();
+    }
+
+    function render() {
+        canvas.innerHTML = '';
+        boxes.forEach(b => {
+            const el = document.createElement('div'); el.className = `box ${activeId === b.id ? 'active' : ''} ${b.scroll ? 'scrolling' : ''}`;
+            let shadow = ""; if(b.outlineW > 0) { for(let i=-b.outlineW; i<=b.outlineW; i++) { for(let j=-b.outlineW; j<=b.outlineW; j++) { if(i===0 && j===0) continue; shadow += `${i}px ${j}px 0 ${b.outlineC},`; } } shadow = shadow.slice(0, -1); }
+            const jH = b.alignH === 'center' ? 'center' : (b.alignH === 'right' ? 'flex-end' : 'flex-start');
+            const jV = b.alignV === 'center' ? 'center' : (b.alignV === 'end' ? 'flex-end' : 'flex-start');
+            el.style.cssText = `left:${b.x}px; top:${b.y}px; width:${b.w}px; height:${b.h}px; font-family:${b.font}; font-size:${b.size}px; color:rgba(${hexToRgb(b.color)},${b.colorA}); background:rgba(${hexToRgb(b.bg)},${b.bgA}); text-shadow:${shadow}; justify-content:${jH}; align-items:${jV};`;
+            const inner = document.createElement('div'); inner.className = 'inner-text'; inner.innerText = b.preview; inner.style.textAlign = b.alignH;
+            if(b.scroll) { const dur = (b.w + (b.preview.length * b.size)) / (b.speed || 50); inner.style.setProperty('--dur', `${dur}s`); if(!b.loop) inner.style.animationIterationCount = "1"; }
+            el.innerHTML = `<div class="resizer"></div>`; el.appendChild(inner);
+            el.onmousedown = (e) => {
+                e.stopPropagation(); select(b.id); if(e.target.className === 'resizer') return;
+                let sX = e.clientX - b.x, sY = e.clientY - b.y;
+                document.onmousemove = (m) => { let nX = m.clientX - sX, nY = m.clientY - sY; if (m.ctrlKey) { nX = Math.round(nX / 20) * 20; nY = Math.round(nY / 20) * 20; } b.x = nX; b.y = nY; render(); };
+                document.onmouseup = () => { document.onmousemove = null; genURL(); };
+            };
+            el.querySelector('.resizer').onmousedown = (e) => {
+                e.stopPropagation(); let sW = b.w, sH = b.h, mX = e.clientX, mY = e.clientY;
+                document.onmousemove = (m) => { let nW = sW + (m.clientX - mX), nH = sH + (m.clientY - mY); if (m.ctrlKey) { nW = Math.round(nW / 10) * 10; nH = Math.round(nH / 10) * 10; } b.w = Math.max(30, nW); b.h = Math.max(20, nH); render(); };
+                document.onmouseup = () => { document.onmousemove = null; genURL(); };
+            };
+            canvas.appendChild(el);
+        });
+        genURL();
+    }
+
+    function delBox() { boxes = boxes.filter(x => x.id !== activeId); activeId = null; render(); }
+    function deselect(e) { if(e.target.id === 'canvas') { activeId = null; render(); } }
+    function genURL() {
+        const channelEl = document.getElementById('g-channel');
+        const errorEl = document.getElementById('channel-error');
+        const ch = channelEl.value.trim();
+        // --- エラーチェックの追記 ---
+        if (!ch) {
+            errorEl.style.display = 'block'; // エラーを表示
+            document.getElementById('url-out').innerText = "ERROR: Channel ID is required";
+            return; // IDがない場合は処理を中断
+        } else {
+            errorEl.style.display = 'none';  // エラーを隠す
+        }
+    // -------------------------
+        const data = boxes.map(b => ({ c: b.cmd, x: b.x, y: b.y, w: b.w, h: b.h, s: b.size, cl: b.color.replace('#',''), cla: b.colorA, bg: b.bg.replace('#',''), bga: b.bgA, f: b.font, ah: b.alignH, av: b.alignV, oc: b.outlineC.replace('#',''), ow: b.outlineW, sc: b.scroll ? 1 : 0, sp: b.speed, lp: b.loop ? 1 : 0 }));
+        const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+        document.getElementById('url-out').innerText = `${window.location.origin}/news.html?channel=${ch}&data=${encoded}`;
+    }
+    function copyURL() {
+    const ch = document.getElementById('g-channel').value.trim();
+    if (!ch) {
+        alert('Channel IDを入力してください！');
+        document.getElementById('channel-error').style.display = 'block';
+        return;
+    }
+    navigator.clipboard.writeText(document.getElementById('url-out').innerText);
+    alert('URL copied!');
+}
+</script>
+</body>
+</html>
