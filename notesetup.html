@@ -222,8 +222,9 @@
     // -------------------------
         const data = boxes.map(b => ({ c: b.cmd, x: b.x, y: b.y, w: b.w, h: b.h, s: b.size, cl: b.color.replace('#',''), cla: b.colorA, bg: b.bg.replace('#',''), bga: b.bgA, f: b.font, ah: b.alignH, av: b.alignV, oc: b.outlineC.replace('#',''), ow: b.outlineW, sc: b.scroll ? 1 : 0, sp: b.speed, lp: b.loop ? 1 : 0 }));
         const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
-        document.getElementById('url-out').innerText = `${window.location.origin}/note.html?channel=${ch}&data=${encoded}`;
-    }
+    // window.location.origin ではなく、現在のパスを取得するように修正
+        const baseUrl = window.location.href.split('notesetup.html')[0];
+        document.getElementById('url-out').innerText = `${baseUrl}note.html?channel=${ch}&data=${encoded}`;    }
     function copyURL() {
     const ch = document.getElementById('g-channel').value.trim();
     if (!ch) {
