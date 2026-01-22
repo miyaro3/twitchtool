@@ -203,12 +203,14 @@
             canvas.appendChild(el);
         });
         genURL();
+        saveSetup();
     }
 
     function delBox() { boxes = boxes.filter(x => x.id !== activeId); activeId = null; render(); }
     function deselect(e) { if(e.target.id === 'canvas') { activeId = null; render(); } }
     function genURL() {
         const channelEl = document.getElementById('g-channel');
+        saveSetup();
         const errorEl = document.getElementById('channel-error');
         const ch = channelEl.value.trim();
         // --- エラーチェックの追記 ---
@@ -235,6 +237,26 @@
     navigator.clipboard.writeText(document.getElementById('url-out').innerText);
     alert('URL copied!');
 }
+
+    function saveSetup() {
+        const setupData = {
+            boxes: boxes,
+            channel: document.getElementById('g-channel').value
+        };
+        localStorage.setItem('noteSetupData', JSON.stringify(setupData));
+    }
+
+    function loadSetup() {
+        const saved = localStorage.getItem('noteSetupData');
+        if (saved) {
+            const data = JSON.parse(saved);
+            boxes = data.boxes || [];
+            document.getElementById('g-channel').value = data.channel || "";
+        }
+    }
+
+    loadSetup();
+    render();
 </script>
 </body>
 </html>
