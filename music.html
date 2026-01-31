@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Figure Pro: Corrected Edition</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <style>
+        :root { --bg: #000; --panel: #1a1a1a; --kick: #ff2d55; --snare: #ffcc00; --hat: #007aff; --bass: #4cd964; --lead: #cc73ff; }
+        body { margin: 0; background: var(--bg); color: white; font-family: -apple-system, sans-serif; overflow: hidden; touch-action: none; user-select: none; }
+        .app { display: flex; flex-direction: column; height: 100vh; padding: 8px; box-sizing: border-box; }
+        .section-title { font-size: 0.55rem; font-weight: bold; color: #888; letter-spacing: 1px; margin: 4px 0 2px 4px; }
+        .presets { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin-bottom: 6px; }
+        .p-btn { background: #222; color: #aaa; border: 1px solid #333; padding: 7px 0; border-radius: 4px; font-size: 0.5rem; }
+        .page-ctrl { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-bottom: 6px; }
+        .page-unit { display: flex; flex-direction: column; gap: 2px; }
+        .page-btn { padding: 8px 0; background: #333; border: 2px solid transparent; color: #888; border-radius: 4px; font-size: 0.65rem; font-weight: bold; }
+        .page-btn.active { background: #555; border-color: white; color: white; }
+        .bar-toggle { padding: 3px; font-size: 0.45rem; background: #222; border: 1px solid #444; color: #666; border-radius: 2px; text-align: center; font-weight: bold; }
+        .bar-toggle.enabled { background: var(--bass); color: #000; border-color: #fff; }
+        .grid-container { background: var(--panel); border-radius: 12px; padding: 8px; margin-bottom: 6px; flex: 1; overflow-y: auto; }
+        .row { display: flex; align-items: center; margin-bottom: 3px; }
+        .label { width: 65px; font-size: 0.55rem; font-weight: 900; text-align: center; border: 1px solid #333; border-radius: 4px; padding: 6px 0; margin-right: 6px; background: #111; flex-shrink: 0; }
+        .steps { display: grid; grid-template-columns: repeat(16, 1fr); gap: 1.5px; flex: 1; }
+        .step { aspect-ratio: 1/1.2; background: #222; border-radius: 1.5px; transition: background 0.1s; position: relative; overflow: hidden; }
+        .step.active[data-inst="kick"] { background: var(--kick); box-shadow: 0 0 4px var(--kick); }
+        .step.active[data-inst="snare"] { background: var(--snare); box-shadow: 0 0 4px var(--snare); }
+        .step.active[data-inst="hat"] { background: var(--hat); box-shadow: 0 0 4px var(--hat); }
+        .step.active[data-inst="bass"] { background: var(--bass); box-shadow: 0 0 4px var(--bass); }
+        .step.active[data-inst^="m"] { background: var(--lead); box-shadow: 0 0 4px var(--lead); }
+        .step.current::after { content: ""; position: absolute; inset: 0; border: 1.5px solid white; border-radius: 1.5px; pointer-events: none; z-index: 10; }
+        .footer { display: grid; grid-template-columns: 1.5fr 1fr; gap: 10px; margin-top: auto; }
+        button.main { height: 44px; border-radius: 22px; border: none; font-weight: bold; }
+        .btn-play { background: white; color: black; }
+        .btn-stop { background: #333; color: white; }
+    </style>
+</head>
+<body>
+
+<div class="app">
+    <div class="section-title">PRESETS (10 TOTAL)</div>
+    <div class="presets" id="rhythm-container"></div>
+    <div class="section-title">PAGE & LOOP RANGE</div>
+    <div class="page-ctrl" id="page-ctrl-area"></div>
+    <div class="grid-container" id="grid-main"></div>
+    <div class="section-title">CHORD PROGRESSION</div>
+    <input type="text" id="chord-prog" style="width:100%; background:#000; color:#4cd964; border:1px solid #333; border-radius:8px; padding:10px; outline:none; font-size: 0.9rem;" value="Dm7 G7 CM7 Am7">
+    <div class="footer">
+        <button class="main btn-play" onclick="start()">PLAY</button>
+        <button class="main btn-stop" onclick="stop()">STOP</button>
+    </div>
+</div>
+
+<script>
+    let currentPage = 0;
+    let isDrawing = false;
+    let drawMode = true;
+    let animId = null;
+    const barActive = [true, false, false, false];
+    const insts = ["kick","snare","hat","bass","m6","m5","m4","m3","m2","m1"];
+    const data = {}; insts.forEach(k => data[k] = Array(64).fill(false));
+    const toneIdx = { kick:0, snare:0, hat:0, bass:0, lead:0 };
+
+    const limiter = new Tone.Limiter(-1).toDestination();
+    // 修正: NoiseSynthの定義を安全な形に変更
+    const hatFilter = new Tone.Filter(8000, "highpass").connect(limiter);
+    const synths = {
+        kick: new Tone.MembraneSynth().connect(limiter),
+        snare: new Tone.NoiseSynth({ 
+            volume: -10, 
+            noise: { type: "white" },
+            envelope: { attack: 0.001, decay: 0.2, sustain: 0 } 
+        }).connect(limiter),
+        hat: new Tone.NoiseSynth({ 
+            volume: -18, 
+            noise: { type: "white" },
+            envelope: { attack: 0.001, decay: 0.05, sustain: 0 } 
+        }).connect(hatFilter),
+        bass: new Tone.FMSynth({ 
+            volume: -12,
+            modulationIndex: 8,
+            envelope: { attack: 0.01, decay: 0.3, sustain: 0.1 },
+            modulation: { type: "square" }
+        }).connect(limiter),
+        lead: new Tone.PolySynth(Tone.Synth, { volume: -20 }).connect(limiter),
+        pad: new Tone.PolySynth(Tone.Synth, { volume: -30 }).connect(limiter)
+    };
+
+    const PRESETS = [
+        { name: "DnB", bpm: 172, chords: "Dm7 G7 CM7 Am7", k:[0,10], s:[4,12], h:[0,2,4,6,8,10,12,14], b:[0,3,6,10], m6:[0,2,3,6,10] },
+        { name: "House", bpm: 124, chords: "Am7 Dm7 G7 CM7", k:[0,4,8,12], s:[4,12], h:[2,6,10,14], b:[0,4,8,12] },
+        { name: "Trap", bpm: 140, chords: "Fm Bbm Eb Ab", k:[0,7,11], s:[8], h:[0,1,2,3,4,5,6], b:[0,8] },
+        { name: "8bit_Act", bpm: 155, chords: "C G Am F", k:[0,4,8,12], s:[4,12], h:[0,2,4,6], b:[0,2,4,6,8,10,12,14], m6:[0,3,4,7,8,11,12] },
+        { name: "RPG_BT", bpm: 144, chords: "Am F G E", k:[0,8], s:[4,12], h:[0,2,4,6,8,10,12,14], b:[0,3,6,8,11,14], m3:[0,2,4,8,10,12] },
+        { name: "LoFi", bpm: 85, chords: "CM7 FM7 Bm7b5 E7", k:[0,11], s:[8], h:[2,6,10,14], b:[0,6,10] },
+        { name: "Chill", bpm: 95, chords: "AbM7 Gm7 Fm7 Bb7", k:[0], s:[8], h:[0,4,8,12], b:[0,8] },
+        { name: "Future", bpm: 160, chords: "F G Em Am", k:[0,4,8,12], s:[4,12], h:[0,2,4,6,8,10,12,14], b:[0,1,4,5,8,9], m6:[0,4,8,12] },
+        { name: "Cyber", bpm: 130, chords: "C#m A B G#", k:[0,4,8,12], s:[4,12], h:[0,1,2,3], b:[0,2,4,6,8,10,12,14] },
+        { name: "Ambient", bpm: 70, chords: "FM7 G6 Em7 Am7", k:[0], s:[], h:[0,8], b:[0], m6:[0] }
+    ];
+
+    function init() {
+        const pgArea = document.getElementById("page-ctrl-area");
+        for(let i=0; i<4; i++) {
+            const unit = document.createElement("div"); unit.className = "page-unit";
+            unit.innerHTML = `<button class="page-btn ${i===0?'active':''}" id="p-${i}" onclick="setPage(${i})">BAR ${i+1}</button>
+                              <div class="bar-toggle ${barActive[i]?'enabled':''}" id="tg-${i}" onclick="toggleBar(${i})">${i===0?'ALWAYS ON':(barActive[i]?'ON':'OFF')}</div>`;
+            pgArea.appendChild(unit);
+        }
+        const gridMain = document.getElementById("grid-main");
+        insts.forEach(inst => {
+            const isLead = inst.startsWith('m');
+            const row = document.createElement("div"); row.className = "row";
+            const lbl = document.createElement("div"); lbl.className = "label"; lbl.id = `label-${inst}`; lbl.style.color = `var(--${isLead?'lead':inst})`;
+            lbl.innerText = isLead ? `LEAD ${inst[1]}` : `${inst.toUpperCase()} 1`;
+            lbl.onclick = () => changeTone(isLead?'lead':inst);
+            const stepsCont = document.createElement("div"); stepsCont.id = `${inst}-g`; stepsCont.className = "steps";
+            for(let i=0; i<16; i++) {
+                const s = document.createElement("div"); s.className = "step"; s.dataset.inst = inst; s.dataset.idx = i;
+                s.onpointerdown = (e) => { e.target.releasePointerCapture(e.pointerId); isDrawing = true; const idx = currentPage*16+i; drawMode = !data[inst][idx]; data[inst][idx]=drawMode; render(); };
+                s.onpointerenter = (e) => { if(isDrawing) { data[inst][currentPage*16+i]=drawMode; render(); } };
+                stepsCont.appendChild(s);
+            }
+            row.appendChild(lbl); row.appendChild(stepsCont); gridMain.appendChild(row);
+        });
+        window.onpointerup = () => isDrawing = false;
+        PRESETS.forEach((p, i) => {
+            const b = document.createElement("button"); b.className = "p-btn"; b.innerText = p.name;
+            b.onclick = () => applyPreset(i); document.getElementById("rhythm-container").appendChild(b);
+        });
+    }
+
+    function render() {
+        insts.forEach(inst => {
+            const container = document.getElementById(`${inst}-g`);
+            if(!container) return;
+            const steps = container.children;
+            for(let i=0; i<16; i++) steps[i].classList.toggle("active", data[inst][currentPage*16+i]);
+        });
+    }
+
+    function setPage(p) { currentPage = p; document.querySelectorAll('.page-btn').forEach((b, i) => b.classList.toggle('active', i === p)); render(); }
+    function toggleBar(p) { if(p===0) return; barActive[p] = !barActive[p]; const el = document.getElementById(`tg-${p}`); el.innerText = barActive[p] ? "ON" : "OFF"; el.classList.toggle("enabled", barActive[p]); }
+
+    function applyPreset(idx) {
+        const p = PRESETS[idx]; Tone.Transport.bpm.value = p.bpm;
+        document.getElementById('chord-prog').value = p.chords;
+        insts.forEach(inst => {
+            data[inst].fill(false);
+            const key = inst.startsWith('m') ? inst : inst[0];
+            if(p[key]) for(let b=0; b<4; b++) p[key].forEach(pos => data[inst][b*16+pos] = true);
+        });
+        render();
+    }
+
+    function changeTone(type) {
+        toneIdx[type] = (toneIdx[type] + 1) % 10;
+        const v = toneIdx[type] / 9;
+        if(type==='kick') synths.kick.set({octaves:2+(v*10), pitchDecay:0.01+(v*0.2)});
+        if(type==='snare') synths.snare.set({envelope:{decay:0.05+(v*0.5)}});
+        if(type==='hat') synths.hat.set({volume: -18 + (v * 5), envelope: { decay: 0.02 + (v * 0.15) }});
+        if(type==='bass') synths.bass.set({modulationIndex: 2 + (v * 20), harmonicity: 0.5 + v});
+        if(type==='lead') synths.lead.set({oscillator:{type:["triangle","sine","square","sawtooth"][toneIdx.lead%4]}});
+        insts.forEach(inst => { if(inst===type || (type==='lead' && inst.startsWith('m'))) document.getElementById(`label-${inst}`).innerText = `${(inst.startsWith('m')?'LEAD':inst).toUpperCase()} ${toneIdx[type]+1}`; });
+    }
+
+    function getChordNotes(chordName) {
+        const notes = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+        const rootMatch = chordName.match(/^[A-G][#b]?/);
+        if(!rootMatch) return ["C4", "E4", "G4", "B4", "D5", "F5"];
+        const root = rootMatch[0].replace('b', (n)=>notes[(notes.indexOf(n[0])+11)%12]);
+        const rootIdx = notes.indexOf(root);
+        const isMinor = chordName.includes('m') && !chordName.includes('maj');
+        const intervals = isMinor ? [0, 3, 7, 10, 14, 17] : [0, 4, 7, 11, 14, 17];
+        return intervals.map(inter => notes[(rootIdx + inter) % 12] + (4 + Math.floor((rootIdx + inter) / 12)));
+    }
+
+    function updateUI() {
+        if (Tone.Transport.state !== "started") return;
+        const bpm = Tone.Transport.bpm.value;
+        const secondsPerStep = 60 / bpm / 4;
+        const totalStepsExact = Tone.Transport.seconds / secondsPerStep;
+        let activeBars = 1; for(let i=3; i>=0; i--) { if(barActive[i]) { activeBars = i+1; break; } }
+        const rhythmStep = Math.floor(totalStepsExact) % (activeBars * 16);
+        const isVisible = Math.floor(rhythmStep / 16) === currentPage;
+        const pageStep = rhythmStep % 16;
+        insts.forEach(inst => {
+            const cont = document.getElementById(`${inst}-g`);
+            if(!cont) return;
+            const steps = cont.children;
+            for(let i=0; i<16; i++) {
+                if (isVisible && i === pageStep) steps[i].classList.add("current");
+                else steps[i].classList.remove("current");
+            }
+        });
+        animId = requestAnimationFrame(updateUI);
+    }
+
+    async function start() {
+        await Tone.start();
+        stop();
+        let lastStep = -1;
+        Tone.Transport.scheduleRepeat((time) => {
+            const bpm = Tone.Transport.bpm.value;
+            const secondsPerStep = 60 / bpm / 4;
+            const totalSteps = Math.round(time / secondsPerStep);
+            if (totalSteps === lastStep) return;
+            lastStep = totalSteps;
+            const chordStep = totalSteps % 64;
+            let activeBars = 1; for(let i=3; i>=0; i--) { if(barActive[i]) { activeBars = i+1; break; } }
+            const rhythmStep = totalSteps % (activeBars * 16);
+            const chords = document.getElementById('chord-prog').value.trim().split(/\s+/);
+            const curChord = chords[Math.floor(chordStep / 16) % chords.length] || chords[0];
+            const chordNotes = getChordNotes(curChord);
+            insts.forEach(inst => {
+                if(data[inst][rhythmStep]) {
+                    if(inst==="kick") synths.kick.triggerAttackRelease("C1","8n",time);
+                    else if(inst==="snare") synths.snare.triggerAttack(time);
+                    else if(inst==="hat") synths.hat.triggerAttack(time);
+                    else if(inst==="bass") synths.bass.triggerAttackRelease(chordNotes[0].replace('4','2'),"16n",time);
+                    else {
+                        const nIdx = parseInt(inst[1]) - 1;
+                        synths.lead.triggerAttackRelease(chordNotes[nIdx], "8n", time);
+                    }
+                }
+            });
+            if(chordStep % 16 === 0) synths.pad.triggerAttackRelease(chordNotes[0],"1n",time);
+        }, "16n");
+        Tone.Transport.start();
+        updateUI();
+    }
+
+    function stop() { 
+        Tone.Transport.stop(); 
+        Tone.Transport.cancel(); 
+        if(animId) cancelAnimationFrame(animId);
+        insts.forEach(inst => {
+            const cont = document.getElementById(`${inst}-g`);
+            if(cont) {
+                const steps = cont.children;
+                for(let s of steps) s.classList.remove("current");
+            }
+        });
+        render(); 
+    }
+    init();
+</script>
+</body>
+</html>
