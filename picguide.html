@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Overlay - 使い方ガイド & OBS設定</title>
+    <style>
+        :root {
+            --primary-bg: #141414;
+            --card-bg: #222222;
+            --accent-color: #9146ff; /* Twitchパープル */
+            --accent-glow: rgba(145, 70, 255, 0.4);
+            --text-color: #ffffff;
+            --command-color: #bf94ff;
+            --obs-blue: #00aaff;
+            --border-color: #3a3a3a;
+        }
+        body {
+            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+            background-color: var(--primary-bg);
+            color: var(--text-color);
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        header {
+            text-align: center;
+            padding: 40px 0;
+            border-bottom: 2px solid var(--accent-color);
+            text-shadow: 0 0 10px var(--accent-glow);
+        }
+        h1 { margin: 0; color: var(--text-color); font-size: 2rem; }
+        .intro { text-align: center; margin: 20px 0; font-size: 1.1rem; color: #ccc; }
+
+        section { margin-top: 40px; }
+        h2 { border-left: 5px solid var(--accent-color); padding-left: 15px; font-size: 1.5rem; margin-bottom: 20px; }
+
+        .command-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+        }
+        .card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+            border: 1px solid var(--border-color);
+        }
+        .cmd-block {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .cmd {
+            display: inline-block;
+            background: #000;
+            color: var(--command-color);
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-family: monospace;
+            font-size: 1.15rem;
+            border: 1px solid var(--accent-color);
+        }
+        .authority {
+            background-color: rgba(145, 70, 255, 0.2);
+            color: #bf94ff;
+            font-size: 0.8rem;
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid var(--accent-color);
+            font-weight: bold;
+        }
+        .desc { margin-top: 8px; font-size: 0.95rem; color: #ddd; }
+        .desc ul { margin: 5px 0 0 0; padding-left: 20px; color: #bbb; }
+
+        /* OBS設定エリア */
+        .setup-section {
+            background: #1b1b1b;
+            padding: 30px;
+            border-radius: 15px;
+            border: 2px solid var(--obs-blue);
+            margin-top: 40px;
+            box-shadow: 0 4px 15px rgba(0, 170, 255, 0.2);
+        }
+        .setup-section h2 { border-left-color: var(--obs-blue); color: var(--obs-blue); }
+        
+        .obs-spec {
+            background: rgba(0, 170, 255, 0.1);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+        }
+        .obs-spec ul { margin: 5px 0; padding-left: 20px; }
+
+        .input-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 10px; font-weight: bold; }
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #444;
+            background: #2d2d2d;
+            color: white;
+            font-size: 1rem;
+            box-sizing: border-box;
+            transition: border-color 0.2s;
+        }
+        input[type="text"]:focus {
+            border-color: var(--obs-blue);
+            outline: none;
+        }
+        .url-display {
+            background: #000;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 0.9rem;
+            color: #44ff44;
+            margin-bottom: 15px;
+            word-break: break-all;
+            min-height: 20px;
+            border: 1px solid #333;
+        }
+        .btn-copy {
+            width: 100%;
+            padding: 15px;
+            background-color: var(--obs-blue);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: 0.2s;
+        }
+        .btn-copy:hover { background-color: #0088cc; }
+        .copy-msg {
+            text-align: center;
+            color: #44ff44;
+            margin-top: 10px;
+            font-size: 0.9rem;
+            display: none;
+        }
+
+        .note {
+            background: rgba(145, 70, 255, 0.08);
+            border: 1px dashed var(--accent-color);
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        footer {
+            text-align: center;
+            margin-top: 50px;
+            padding: 20px;
+            font-size: 0.8rem;
+            color: #666;
+            border-top: 1px solid #222;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>🖼️ Image Overlay 使い方ガイド</h1>
+        <p class="intro">チャットコマンドで配信画面に画像を大きく表示させよう！</p>
+    </header>
+
+    <section>
+        <h2>基本ルール</h2>
+        <p>配信中にチャットから特定のコマンドを打つことで、指定したWeb上の画像（PNG, JPG, GIF, WebP等）をフェードアニメーションと共に配信画面中央にポップアップ表示できます。</p>
+    </section>
+
+    <section>
+        <h2>コマンド仕様</h2>
+        <div class="command-grid">
+            <div class="card">
+                <div class="cmd-block">
+                    <span class="cmd">!img [画像URL]</span>
+                    <span class="authority">配信者・モデレーター専用</span>
+                </div>
+                <div class="desc">
+                    指定したURLの画像を画面中央に大きく表示します。
+                    <ul>
+                        <li>表示から<strong>90秒間</strong>維持されたあと、1.5秒かけて自動フェードアウトします。</li>
+                        <li>すでに画像が表示されている状態で新しいコマンドが打たれた場合、前の画像は破棄され、新しい画像が瞬時に上書き表示されます。</li>
+                        <li>対応形式: .png, .jpg, .jpeg, .gif, .webp</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <div class="note">
+        <strong>💡 連携のポイント:</strong> 画像は直リンクURLのみ対応しています。Discordなどの期限付き画像URLは、時間経過により表示できなくなる場合があるため、Imgur等の画像共有プラットフォームのご利用を推奨します。
+    </div>
+
+    <section class="setup-section">
+        <h2>配信者用 OBSブラウザソース設定</h2>
+        
+        <div class="obs-spec">
+            <strong>【推奨設定】</strong>
+            <ul>
+                <li>幅: <strong>1920</strong> （または配信出力解像度に合わせてください）</li>
+                <li>高さ: <strong>1080</strong></li>
+                <li>「表示されていないときにソースを閉じる」を<strong>オフ</strong>にする（接続が途切れるのを防ぎます）</li>
+            </ul>
+        </div>
+
+        <div class="input-group">
+            <label for="twitchId">1. Twitch チャンネル名を入力</label>
+            <input type="text" id="twitchId" placeholder="your_channel_name" oninput="generateUrl()">
+        </div>
+
+        <label>2. 生成されたURL</label>
+        <div class="url-display" id="generatedUrl">IDを入力してください...</div>
+
+        <button class="btn-copy" onclick="copyToClipboard()">URLをコピーしてOBSに貼る</button>
+        <div class="copy-msg" id="copyMsg">コピーしました！OBSのブラウザソース「URL」欄に貼り付けてください。</div>
+    </section>
+
+    <footer>
+        &copy; 2026 Image Overlay Interactive System
+    </footer>
+</div>
+
+<script>
+    function generateUrl() {
+        const id = document.getElementById('twitchId').value.trim();
+        const display = document.getElementById('generatedUrl');
+        
+        if (id) {
+            // 前のステップで作成した「画像表示オーバーレイ」本体のファイル名(pic.html または任意の名前)に書き換えてください。
+            const currentPath = window.location.href.substring(0, window.location.href.lastIndexOf('/') + 1);
+            const fullUrl = currentPath + "pic.html?channel=" + id;
+            display.innerText = fullUrl;
+        } else {
+            display.innerText = "IDを入力してください...";
+        }
+    }
+
+    function copyToClipboard() {
+        const urlText = document.getElementById('generatedUrl').innerText;
+        if (urlText.includes("IDを入力してください")) return;
+
+        navigator.clipboard.writeText(urlText).then(() => {
+            const msg = document.getElementById('copyMsg');
+            msg.style.display = 'block';
+            setTimeout(() => { msg.style.display = 'none'; }, 3000);
+        });
+    }
+</script>
+
+</body>
+</html>
