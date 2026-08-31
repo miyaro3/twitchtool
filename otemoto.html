@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>お手元配信メーカー</title>
+  <style>
+    :root {
+      --primary: #4f46e5;
+      --primary-hover: #4338ca;
+      --success: #10b981;
+      --success-hover: #059669;
+      --bg: #0f172a;
+      --panel: #1e293b;
+      --text: #f8fafc;
+      --subtext: #94a3b8;
+      --border: #334155;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    h1 {
+      font-size: 1.8rem;
+      margin-bottom: 4px;
+      text-align: center;
+      color: #ffffff;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+    }
+
+    p.subtitle {
+      color: var(--subtext);
+      font-size: 0.85rem;
+      margin-top: 0;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    .container {
+      background: var(--panel);
+      padding: 24px;
+      border-radius: 12px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+      width: 100%;
+      max-width: 720px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .upload-area {
+      border: 2px dashed #475569;
+      border-radius: 8px;
+      padding: 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s;
+    }
+
+    .upload-area:hover {
+      background: #334155;
+      border-color: #64748b;
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+
+    .canvas-container {
+      position: relative;
+      width: 100%;
+      background: #020617;
+      border-radius: 8px;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 320px;
+    }
+
+    canvas {
+      max-width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    .controls-header {
+      font-size: 0.95rem;
+      font-weight: bold;
+      color: #38bdf8;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 6px;
+      margin-top: 4px;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px 18px;
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    label {
+      font-size: 0.8rem;
+      color: var(--subtext);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--primary);
+    }
+
+    .btn-group {
+      grid-column: span 2;
+      display: flex;
+      gap: 12px;
+      margin-top: 10px;
+    }
+
+    .btn {
+      flex: 1;
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 12px 18px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 0.95rem;
+      transition: background 0.2s, opacity 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn:hover:not(:disabled) {
+      background: var(--primary-hover);
+    }
+
+    .btn-record {
+      background: var(--success);
+    }
+
+    .btn-record:hover:not(:disabled) {
+      background: var(--success-hover);
+    }
+
+    .btn:disabled {
+      background: #475569;
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+
+    .status-bar {
+      grid-column: span 2;
+      font-size: 0.85rem;
+      text-align: center;
+      color: #38bdf8;
+      min-height: 1.2em;
+    }
+
+    .progress-bar-container {
+      grid-column: span 2;
+      height: 6px;
+      background: #334155;
+      border-radius: 3px;
+      overflow: hidden;
+      display: none;
+    }
+
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background: var(--success);
+      transition: width 0.1s linear;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>お手元配信メーカー</h1>
+  <p class="subtitle">画像1枚からリアルなFPS手元配信アニメーションを作成 & 動画出力</p>
+
+  <div class="container">
+    <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+      <p id="uploadText">📷 クリックして「マウスを持った画像」をアップロード</p>
+      <input type="file" id="fileInput" accept="image/*">
+    </div>
+
+    <div class="canvas-container">
+      <canvas id="stage"></canvas>
+    </div>
+
+    <div class="controls-header">🎛 動作・モーションパラメータ設定</div>
+
+    <div class="controls">
+      <!-- フリック頻度 -->
+      <div class="control-group">
+        <label for="flickFreq">フリック発生頻度 <span id="val-flickFreq">50%</span></label>
+        <input type="range" id="flickFreq" min="0" max="100" value="50">
+      </div>
+
+      <!-- フリックの大きさ -->
+      <div class="control-group">
+        <label for="flickDist">フリック移動量 <span id="val-flickDist">100%</span></label>
+        <input type="range" id="flickDist" min="20" max="300" value="100">
+      </div>
+
+      <!-- 微調整（リコイル/追従）頻度 -->
+      <div class="control-group">
+        <label for="microFreq">微調整・トラッキング頻度 <span id="val-microFreq">60%</span></label>
+        <input type="range" id="microFreq" min="0" max="100" value="60">
+      </div>
+
+      <!-- 手振れ・ブレ量 -->
+      <div class="control-group">
+        <label for="jitterAmount">エイム時の微細なブレ <span id="val-jitterAmount">1.5px</span></label>
+        <input type="range" id="jitterAmount" min="0" max="5" step="0.5" value="1.5">
+      </div>
+
+      <!-- 画面全体のズーム (100% ~ 400%) -->
+      <div class="control-group">
+        <label for="zoom">画像ズーム (最大400%) <span id="val-zoom">120%</span></label>
+        <input type="range" id="zoom" min="100" max="400" value="120">
+      </div>
+
+      <!-- 全体感度・速度 -->
+      <div class="control-group">
+        <label for="sens">反応速度・キレ <span id="val-sens">1.5</span></label>
+        <input type="range" id="sens" min="0.5" max="3.0" step="0.1" value="1.5">
+      </div>
+
+      <!-- 全体の移動スケール -->
+      <div class="control-group">
+        <label for="moveAmount">全体の可動域 <span id="val-moveAmount">100%</span></label>
+        <input type="range" id="moveAmount" min="20" max="200" value="100">
+      </div>
+
+      <!-- 録画時間 -->
+      <div class="control-group">
+        <label for="recDuration">動画保存長さ <span id="val-recDuration">5秒</span></label>
+        <input type="range" id="recDuration" min="2" max="15" value="5">
+      </div>
+
+      <div class="status-bar" id="statusText"></div>
+
+      <div class="progress-bar-container" id="progressContainer">
+        <div class="progress-bar" id="progressBar"></div>
+      </div>
+
+      <div class="btn-group">
+        <button id="toggleBtn" class="btn" disabled>再生 / 停止</button>
+        <button id="recordBtn" class="btn btn-record" disabled>🎥 WebM動画として保存</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const fileInput = document.getElementById('fileInput');
+    const stage = document.getElementById('stage');
+    const ctx = stage.getContext('2d');
+    
+    // UI controls
+    const flickFreqInput = document.getElementById('flickFreq');
+    const flickDistInput = document.getElementById('flickDist');
+    const microFreqInput = document.getElementById('microFreq');
+    const jitterAmountInput = document.getElementById('jitterAmount');
+    const zoomInput = document.getElementById('zoom');
+    const sensInput = document.getElementById('sens');
+    const moveAmountInput = document.getElementById('moveAmount');
+    const recDurationInput = document.getElementById('recDuration');
+
+    const toggleBtn = document.getElementById('toggleBtn');
+    const recordBtn = document.getElementById('recordBtn');
+    const uploadText = document.getElementById('uploadText');
+    const statusText = document.getElementById('statusText');
+    const progressContainer = document.getElementById('progressContainer');
+    const progressBar = document.getElementById('progressBar');
+
+    // Values display elements
+    const valFlickFreq = document.getElementById('val-flickFreq');
+    const valFlickDist = document.getElementById('val-flickDist');
+    const valMicroFreq = document.getElementById('val-microFreq');
+    const valJitterAmount = document.getElementById('val-jitterAmount');
+    const valZoom = document.getElementById('val-zoom');
+    const valSens = document.getElementById('val-sens');
+    const valMoveAmount = document.getElementById('val-moveAmount');
+    const valRecDuration = document.getElementById('val-recDuration');
+
+    let img = new Image();
+    let isPlaying = false;
+    let isRecording = false;
+    let animationFrameId = null;
+
+    // Tracking state
+    let currentX = 0, currentY = 0, currentAngle = 0;
+    let targetX = 0, targetY = 0, targetAngle = 0;
+    let state = 'IDLE';
+    let stateTimer = 0;
+
+    // MediaRecorder vars
+    let mediaRecorder = null;
+    let recordedChunks = [];
+
+    // Value update listeners
+    flickFreqInput.addEventListener('input', () => valFlickFreq.textContent = `${flickFreqInput.value}%`);
+    flickDistInput.addEventListener('input', () => valFlickDist.textContent = `${flickDistInput.value}%`);
+    microFreqInput.addEventListener('input', () => valMicroFreq.textContent = `${microFreqInput.value}%`);
+    jitterAmountInput.addEventListener('input', () => valJitterAmount.textContent = `${jitterAmountInput.value}px`);
+    zoomInput.addEventListener('input', () => valZoom.textContent = `${zoomInput.value}%`);
+    sensInput.addEventListener('input', () => valSens.textContent = sensInput.value);
+    moveAmountInput.addEventListener('input', () => valMoveAmount.textContent = `${moveAmountInput.value}%`);
+    recDurationInput.addEventListener('input', () => valRecDuration.textContent = `${recDurationInput.value}秒`);
+
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        img.onload = () => {
+          stage.width = img.width;
+          stage.height = img.height;
+          
+          uploadText.textContent = `選択中: ${file.name}`;
+          toggleBtn.disabled = false;
+          recordBtn.disabled = false;
+          isPlaying = true;
+          toggleBtn.textContent = '停止';
+          
+          currentX = 0; currentY = 0; currentAngle = 0;
+          targetX = 0; targetY = 0; targetAngle = 0;
+          stateTimer = 0;
+
+          startAnimation();
+        };
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    function updateAIState() {
+      stateTimer--;
+      if (stateTimer > 0) return;
+
+      const flickFreq = parseFloat(flickFreqInput.value) / 100; // 0.0 ~ 1.0
+      const flickDist = parseFloat(flickDistInput.value) / 100;
+      const microFreq = parseFloat(microFreqInput.value) / 100; // 0.0 ~ 1.0
+      const sens = parseFloat(sensInput.value);
+      const overallScale = parseFloat(moveAmountInput.value) / 100;
+
+      const rand = Math.random();
+
+      // Weighted decision based on user sliders
+      const flickThreshold = flickFreq * 0.5; // Max 50% probability
+      const microThreshold = flickThreshold + (microFreq * 0.4); // Max +40% probability
+
+      if (rand < flickThreshold) {
+        // FLICK ACTION
+        state = 'FLICK';
+        const distance = (80 + Math.random() * 120) * sens * flickDist * overallScale;
+        const angleDir = Math.random() * Math.PI * 2;
+        targetX = Math.cos(angleDir) * distance;
+        targetY = Math.sin(angleDir) * distance * 0.4;
+        targetAngle = (targetX / 25) * (Math.PI / 180);
+        stateTimer = Math.max(3, Math.floor((Math.random() * 8 + 4) / sens));
+      } else if (rand < microThreshold) {
+        // MICRO ADJUSTMENT / RECOIL ACTION
+        state = 'MICRO';
+        targetX += (Math.random() - 0.5) * 24 * sens * overallScale;
+        targetY += (Math.random() - 0.5) * 14 * sens * overallScale;
+        targetAngle = (Math.random() - 0.5) * 5 * (Math.PI / 180) * overallScale;
+        stateTimer = Math.max(4, Math.floor((Math.random() * 10 + 5) / sens));
+      } else {
+        // IDLE STATE
+        state = 'IDLE';
+        targetX *= 0.3;
+        targetY *= 0.3;
+        targetAngle = 0;
+        stateTimer = Math.floor(Math.random() * 15 + 8);
+      }
+    }
+
+    function draw() {
+      if (!isPlaying && !isRecording) return;
+
+      updateAIState();
+
+      const easeFactor = state === 'FLICK' ? 0.38 : 0.15;
+
+      currentX += (targetX - currentX) * easeFactor;
+      currentY += (targetY - currentY) * easeFactor;
+      currentAngle += (targetAngle - currentAngle) * easeFactor;
+
+      const jitterMax = parseFloat(jitterAmountInput.value);
+      const jitterX = (Math.random() - 0.5) * jitterMax * 2;
+      const jitterY = (Math.random() - 0.5) * jitterMax * 2;
+
+      ctx.clearRect(0, 0, stage.width, stage.height);
+      ctx.save();
+      
+      const centerX = stage.width / 2;
+      const centerY = stage.height / 2;
+      const zoomScale = parseFloat(zoomInput.value) / 100;
+
+      ctx.translate(centerX + currentX + jitterX, centerY + currentY + jitterY);
+      ctx.scale(zoomScale, zoomScale);
+      ctx.rotate(currentAngle);
+      ctx.drawImage(img, -centerX, -centerY);
+
+      ctx.restore();
+
+      animationFrameId = requestAnimationFrame(draw);
+    }
+
+    function startAnimation() {
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+      draw();
+    }
+
+    toggleBtn.addEventListener('click', () => {
+      isPlaying = !isPlaying;
+      if (isPlaying) {
+        toggleBtn.textContent = '停止';
+        startAnimation();
+      } else {
+        toggleBtn.textContent = '再生';
+        cancelAnimationFrame(animationFrameId);
+      }
+    });
+
+    recordBtn.addEventListener('click', () => {
+      if (isRecording) return;
+
+      const durationSec = parseInt(recDurationInput.value);
+      recordedChunks = [];
+
+      const stream = stage.captureStream(60);
+      
+      let mimeType = 'video/webm;codecs=vp9';
+      if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/webm;codecs=vp8';
+      if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/webm';
+
+      try {
+        mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
+      } catch (e) {
+        statusText.textContent = "お使いのブラウザはWebM録画に対応していません。";
+        return;
+      }
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) recordedChunks.push(event.data);
+      };
+
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(recordedChunks, { type: 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `handcam_${Date.now()}.webm`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+        isRecording = false;
+        recordBtn.disabled = false;
+        toggleBtn.disabled = false;
+        statusText.textContent = "録画完了！WebM形式でダウンロードしました。";
+        progressContainer.style.display = 'none';
+        progressBar.style.width = '0%';
+      };
+
+      isRecording = true;
+      if (!isPlaying) {
+        isPlaying = true;
+        toggleBtn.textContent = '停止';
+        startAnimation();
+      }
+
+      recordBtn.disabled = true;
+      toggleBtn.disabled = true;
+      statusText.textContent = `🎥 録画中... (${durationSec}秒)`;
+      progressContainer.style.display = 'block';
+
+      mediaRecorder.start();
+
+      const startTime = Date.now();
+      const interval = setInterval(() => {
+        const elapsed = (Date.now() - startTime) / 1000;
+        const percent = Math.min((elapsed / durationSec) * 100, 100);
+        progressBar.style.width = `${percent}%`;
+
+        if (elapsed >= durationSec) {
+          clearInterval(interval);
+          if (mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+        }
+      }, 50);
+    });
+  </script>
+</body>
+</html>
