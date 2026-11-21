@@ -1,0 +1,1381 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Twitch コメントビューア</title>
+<script src="https://cdn.jsdelivr.net/npm/comfy.js@latest/dist/comfy.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=DotGothic16&family=Hachi+Maru+Pop&family=Kaisei+Decol:wght@700&family=Kosugi+Maru&family=M+PLUS+Rounded+1c:wght@500;700&family=Noto+Sans+JP:wght@500;700&family=Yusei+Magic&family=Zen+Maru+Gothic:wght@500;700&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --bg-color: #121216;
+    --card-bg: #1e1e26;
+    --first-bg: #7f1d1d;
+    --first-border: #ef4444;
+    --text-color: #efeff1;
+    --user-color: #a970ff;
+    --font-family: "Noto Sans JP", sans-serif;
+    --font-size: 16px;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg-color);
+    color: var(--text-color);
+    font-family: var(--font-family);
+    font-size: var(--font-size);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* OBSモード時のスタイル */
+  body.obs-mode {
+    overflow: hidden;
+  }
+  body.obs-mode .top-bar,
+  body.obs-mode .settings-panel {
+    display: none !important;
+  }
+  body.obs-mode .chat-container {
+    padding: 10px;
+    max-width: 100%;
+    height: 100vh;
+    justify-content: flex-end;
+    overflow: hidden;
+  }
+  body.obs-mode .chat-item {
+    border: none;
+    box-shadow: none;
+  }
+
+  .top-bar {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 44px;
+    background: rgba(18, 18, 22, 0.92);
+    backdrop-filter: blur(6px);
+    border-bottom: 1px solid #2e2e3a;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 14px;
+    z-index: 100;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 13px;
+  }
+
+  .status-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #b5b5c3;
+  }
+
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #555;
+  }
+  .status-dot.connected {
+    background: #22c55e;
+    box-shadow: 0 0 8px #22c55e;
+  }
+  .status-dot.recording {
+    background: #ef4444;
+    box-shadow: 0 0 8px #ef4444;
+  }
+
+  .top-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  .btn-small {
+    background: #2a2a35;
+    color: #efeff1;
+    border: 1px solid #3f3f4e;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-small:hover { background: #3a3a48; }
+  .btn-small.active {
+    background: #166534;
+    border-color: #22c55e;
+    color: #fff;
+  }
+  .btn-small.obs-btn {
+    background: #5b21b6;
+    border-color: #8b5cf6;
+  }
+  .btn-small.obs-btn:hover { background: #6d28d9; }
+
+  .chat-container {
+    padding: 54px 12px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  .chat-item {
+    background: var(--card-bg);
+    border: 1px solid #2e2e3a;
+    border-radius: 8px;
+    padding: 8px 12px;
+    line-height: 1.45;
+    word-break: break-word;
+    animation: slideIn 0.18s ease-out;
+  }
+
+  .chat-item.is-first {
+    background: var(--first-bg);
+    border-color: var(--first-border);
+    box-shadow: 0 2px 10px rgba(239, 68, 68, 0.25);
+  }
+
+  .chat-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 2px;
+    font-size: 0.85em;
+  }
+
+  .first-badge {
+    background: #ef4444;
+    color: #fff;
+    font-size: 0.75em;
+    font-weight: bold;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-family: sans-serif;
+  }
+
+  .chat-user { font-weight: 700; color: var(--user-color); }
+
+  .chat-time {
+    color: rgba(255, 255, 255, 0.45);
+    font-size: 0.8em;
+    margin-left: auto;
+    font-family: monospace;
+  }
+
+  .chat-message { color: var(--text-color); }
+
+  /* OBS用縁取りオプション */
+  body.obs-outline .chat-message,
+  body.obs-outline .chat-user {
+    text-shadow:
+      -1px -1px 0 #000,
+       1px -1px 0 #000,
+      -1px  1px 0 #000,
+       1px  1px 0 #000,
+       0px  2px 4px rgba(0,0,0,0.8);
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .settings-panel {
+    position: fixed;
+    top: 44px; right: 0; bottom: 0;
+    width: 400px;
+    max-width: 100vw;
+    background: #1a1a22;
+    border-left: 1px solid #323240;
+    padding: 16px;
+    overflow-y: auto;
+    z-index: 200;
+    transform: translateX(100%);
+    transition: transform 0.22s ease;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 13px;
+  }
+  .settings-panel.open { transform: translateX(0); }
+
+  .settings-panel h3 {
+    margin: 0 0 14px;
+    font-size: 15px;
+    border-bottom: 1px solid #2e2e3a;
+    padding-bottom: 8px;
+  }
+
+  .setting-group {
+    margin-bottom: 16px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid #282834;
+  }
+
+  .setting-group h4 {
+    margin: 0 0 10px;
+    font-size: 13px;
+    color: #a970ff;
+  }
+
+  .form-row {
+    margin-bottom: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .form-row.inline {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  label { color: #d1d1dc; font-size: 12px; }
+
+  input[type="text"],
+  input[type="number"],
+  select {
+    background: #121216;
+    border: 1px solid #3a3a4a;
+    color: #fff;
+    border-radius: 5px;
+    padding: 6px 8px;
+    font-size: 13px;
+    width: 100%;
+  }
+
+  input[type="color"] {
+    background: #121216;
+    border: 1px solid #3a3a4a;
+    border-radius: 4px;
+    width: 48px;
+    height: 28px;
+    padding: 2px;
+    cursor: pointer;
+  }
+
+  input[type="file"] { font-size: 11px; color: #b5b5c3; }
+
+  .file-input-wrap { display: flex; gap: 6px; align-items: center; }
+
+  .btn-test {
+    background: #3b3b4d;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 5px 8px;
+    font-size: 11px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .btn-test:hover { background: #4e4e66; }
+
+  .btn-primary {
+    background: #9146ff;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    width: 100%;
+  }
+  .btn-primary:hover { background: #772ce8; }
+
+  .btn-success {
+    background: #15803d;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    width: 100%;
+  }
+  .btn-success:hover { background: #166534; }
+
+  .sub-options {
+    background: #14141a;
+    padding: 10px;
+    border-radius: 6px;
+    margin-top: 6px;
+    border: 1px solid #282834;
+  }
+
+  .hint { font-size: 11px; color: #8e8ea0; margin-top: 2px; line-height: 1.4; }
+
+  .channel-prompt-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 10, 14, 0.88);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    padding: 20px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  .channel-prompt-card {
+    background: #1e1e26;
+    border: 1px solid #2e2e3a;
+    border-radius: 10px;
+    padding: 28px;
+    width: 100%;
+    max-width: 420px;
+    text-align: center;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  }
+  .channel-prompt-card h2 { margin: 0 0 10px; font-size: 1.2rem; }
+  .channel-prompt-card p { margin: 0 0 20px; font-size: 0.9rem; color: #b5b5c3; line-height: 1.6; }
+  .channel-prompt-form { display: flex; gap: 8px; }
+  .channel-prompt-form input {
+    flex: 1;
+    padding: 10px 12px;
+    border-radius: 6px;
+    border: 1px solid #3a3a4a;
+    background: #121216;
+    color: #ffffff;
+    font-size: 0.95rem;
+  }
+  .channel-prompt-form button {
+    padding: 10px 18px;
+    border-radius: 6px;
+    border: none;
+    background: #9146ff;
+    color: #ffffff;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+  <div class="top-bar">
+    <div class="status-badge">
+      <span class="status-dot" id="statusDot"></span>
+      <span id="statusText">未接続</span>
+      <span id="queueCounter" style="font-size:11px; color:#8e8ea0;">(待機: 0)</span>
+    </div>
+    <div class="top-actions">
+      <button class="btn-small" id="btnTestComment">テスト発言</button>
+      <button class="btn-small" id="btnAutoWriteTop" title="リアルタイムTXT上書き保存の開始/停止">TXT自動保存: OFF</button>
+      <button class="btn-small obs-btn" id="btnOpenObsTop" title="OBS表示用ウィンドウを開く">OBS用表示を開く</button>
+      <button class="btn-small" id="btnResetUsers">初コメリセット</button>
+      <button class="btn-small" id="btnToggleSettings">⚙️ 設定</button>
+    </div>
+  </div>
+
+  <div class="chat-container" id="chatContainer"></div>
+
+  <div class="settings-panel" id="settingsPanel">
+    <h3>コメントビューア設定</h3>
+
+    <!-- OBS表示用ビューア設定 -->
+    <div class="setting-group">
+      <h4>OBS表示用ビューア設定（?mode=obs）</h4>
+      <div class="form-row">
+        <label for="optObsFont">OBS用フォント</label>
+        <select id="optObsFont">
+          <option value='"Noto Sans JP", sans-serif'>1. Noto Sans JP（標準ゴシック）</option>
+          <option value='"M PLUS Rounded 1c", sans-serif'>2. M PLUS Rounded 1c（丸ゴシック）</option>
+          <option value='"Kosugi Maru", sans-serif'>3. Kosugi Maru（やわらか丸ゴ）</option>
+          <option value='"Zen Maru Gothic", sans-serif'>4. Zen Maru Gothic（すっきり丸ゴ）</option>
+          <option value='"Dela Gothic One", cursive'>5. Dela Gothic One（極太インパクト）</option>
+          <option value='"DotGothic16", sans-serif'>6. DotGothic16（ドット絵風）</option>
+          <option value='"Kaisei Decol", serif'>7. Kaisei Decol（デザイン明朝）</option>
+          <option value='"Yusei Magic", sans-serif'>8. Yusei Magic（手書きマジック）</option>
+          <option value='"Hachi Maru Pop", cursive'>9. Hachi Maru Pop（かわいい手書き）</option>
+          <option value='system-ui, -apple-system, "Hiragino Kaku Gothic ProN", Meiryo, sans-serif'>10. OS標準フォント</option>
+        </select>
+      </div>
+      <div class="form-row inline">
+        <label for="optObsFontSize">OBS文字サイズ (px)</label>
+        <input type="number" id="optObsFontSize" min="12" max="72" style="width: 80px;">
+      </div>
+      <div class="form-row inline">
+        <label for="optObsBgTransparent">背景を透過する（OBS推奨）</label>
+        <input type="checkbox" id="optObsBgTransparent">
+      </div>
+      <div class="form-row inline">
+        <label for="optObsBgColor">背景色（透過OFF時）</label>
+        <input type="color" id="optObsBgColor">
+      </div>
+      <div class="form-row inline">
+        <label for="optObsCardTransparent">コメント枠の背景を透過</label>
+        <input type="checkbox" id="optObsCardTransparent">
+      </div>
+      <div class="form-row inline">
+        <label for="optObsCardColor">コメント枠の背景色</label>
+        <input type="color" id="optObsCardColor">
+      </div>
+      <div class="form-row inline">
+        <label for="optObsTextColor">コメント文字色</label>
+        <input type="color" id="optObsTextColor">
+      </div>
+      <div class="form-row inline">
+        <label for="optObsFirstBgColor">初コメ時の背景色</label>
+        <input type="color" id="optObsFirstBgColor">
+      </div>
+      <div class="form-row inline">
+        <label for="optObsOutline">文字に黒縁取りを付ける</label>
+        <input type="checkbox" id="optObsOutline">
+      </div>
+      <div class="form-row inline">
+        <label for="optObsSoundEnabled">OBS側でも効果音/読み上げを実行</label>
+        <input type="checkbox" id="optObsSoundEnabled">
+      </div>
+      <div class="form-row" style="margin-top: 8px;">
+        <button class="btn-primary" id="btnOpenObsPanel">OBS表示用ビューアを開く</button>
+        <div class="file-input-wrap" style="margin-top: 6px;">
+          <input type="text" id="obsUrlPreview" readonly style="font-size:11px; color:#a1a1aa;">
+          <button class="btn-test" id="btnCopyObsUrl">URLコピー</button>
+        </div>
+        <span class="hint">※OBSの「ブラウザ」ソースにこのURLを貼るか、上のボタンで別窓表示できます（設定はURLパラメータにも反映されます）。</span>
+      </div>
+    </div>
+
+    <!-- リアルタイムテキストファイル書き出し -->
+    <div class="setting-group">
+      <h4>リアルタイムTXT上書き保存（OBSテキスト参照用）</h4>
+      <div class="form-row inline">
+        <label for="optExportLines">書き出し行数（最新N行 / 0で全件）</label>
+        <input type="number" id="optExportLines" min="0" max="5000" style="width: 90px;">
+      </div>
+      <div class="form-row inline">
+        <label for="optIncludeMetaInExport">時刻・ユーザー名を含める</label>
+        <input type="checkbox" id="optIncludeMetaInExport">
+      </div>
+      <div class="form-row inline">
+        <label for="optReverseExport">新しいコメントを上（先頭行）にする</label>
+        <input type="checkbox" id="optReverseExport">
+      </div>
+      <div class="form-row" style="margin-top: 8px;">
+        <button class="btn-success" id="btnSelectAutoFile">保存先TXTファイルを選択してリアルタイム保存開始</button>
+        <span class="hint" id="autoFileStatus">状態: 未設定（Chrome/Edge等のFile System Access API対応ブラウザで指定可能）</span>
+      </div>
+      <div class="form-row" style="margin-top: 6px;">
+        <button class="btn-test" id="btnManualDownloadTxt" style="width:100%; padding:6px;">手動で1回ダウンロード保存（Firefox等向け）</button>
+      </div>
+    </div>
+
+    <!-- 管理画面側の表示・フォント設定 -->
+    <div class="setting-group">
+      <h4>管理ビューア 表示・フォント</h4>
+      <div class="form-row">
+        <label for="optFont">フォント選択（10種類）</label>
+        <select id="optFont">
+          <option value='"Noto Sans JP", sans-serif'>1. Noto Sans JP（標準ゴシック）</option>
+          <option value='"M PLUS Rounded 1c", sans-serif'>2. M PLUS Rounded 1c（丸ゴシック）</option>
+          <option value='"Kosugi Maru", sans-serif'>3. Kosugi Maru（やわらか丸ゴ）</option>
+          <option value='"Zen Maru Gothic", sans-serif'>4. Zen Maru Gothic（すっきり丸ゴ）</option>
+          <option value='"Dela Gothic One", cursive'>5. Dela Gothic One（極太インパクト）</option>
+          <option value='"DotGothic16", sans-serif'>6. DotGothic16（ドット絵風）</option>
+          <option value='"Kaisei Decol", serif'>7. Kaisei Decol（デザイン明朝）</option>
+          <option value='"Yusei Magic", sans-serif'>8. Yusei Magic（手書きマジック）</option>
+          <option value='"Hachi Maru Pop", cursive'>9. Hachi Maru Pop（かわいい手書き）</option>
+          <option value='system-ui, -apple-system, "Hiragino Kaku Gothic ProN", Meiryo, sans-serif'>10. OS標準フォント</option>
+        </select>
+      </div>
+      <div class="form-row inline">
+        <label for="optFontSize">文字サイズ (px)</label>
+        <input type="number" id="optFontSize" min="10" max="48" style="width: 80px;">
+      </div>
+      <div class="form-row inline">
+        <label for="optMaxComments">最大表示件数</label>
+        <input type="number" id="optMaxComments" min="10" max="500" style="width: 80px;">
+      </div>
+    </div>
+
+    <!-- 効果音設定 -->
+    <div class="setting-group">
+      <h4>効果音 (SE) 設定</h4>
+      <div class="form-row inline">
+        <label for="optSeVolume">SE音量 (<span id="seVolLabel">80</span>%)</label>
+        <input type="range" id="optSeVolume" min="0" max="100" style="width: 150px;">
+      </div>
+      <div class="form-row">
+        <label>初コメ時の音（デフォルト: neko.mp3）</label>
+        <div class="file-input-wrap">
+          <input type="text" id="optFirstSoundPath" placeholder="neko.mp3">
+          <button class="btn-test" id="btnTestFirstSe">再生</button>
+        </div>
+        <input type="file" id="fileFirstSound" accept="audio/*">
+      </div>
+      <div class="form-row" style="margin-top: 10px;">
+        <label>通常コメ時の音（デフォルト: ko.mp3）</label>
+        <div class="file-input-wrap">
+          <input type="text" id="optNormalSoundPath" placeholder="ko.mp3">
+          <button class="btn-test" id="btnTestNormalSe">再生</button>
+        </div>
+        <input type="file" id="fileNormalSound" accept="audio/*">
+      </div>
+    </div>
+
+    <!-- 読み上げ・長文/キュー対策 -->
+    <div class="setting-group">
+      <h4>コメント読み上げ・長文/キュー制御</h4>
+      <div class="form-row inline">
+        <label for="optTtsEnabled">読み上げを有効にする</label>
+        <input type="checkbox" id="optTtsEnabled">
+      </div>
+
+      <div class="form-row">
+        <label for="optTtsEngine">読み上げエンジン</label>
+        <select id="optTtsEngine">
+          <option value="webspeech">ブラウザ標準 (Web Speech API)</option>
+          <option value="bouyomi">棒読みちゃん (HTTP連携)</option>
+          <option value="voicevox">VOICEVOX (ローカルAPI)</option>
+        </select>
+      </div>
+
+      <div class="sub-options">
+        <div class="form-row">
+          <label for="optLongTextMode">長文・上限超過時の扱い</label>
+          <select id="optLongTextMode">
+            <option value="truncate_suffix">指定文字数で切り「以下略」を付ける</option>
+            <option value="truncate_only">指定文字数で切り詰める（「以下略」なし）</option>
+            <option value="fast_only">省略せず、長い文は早口で読む</option>
+            <option value="full">そのまま全文を読む</option>
+          </select>
+        </div>
+        <div class="form-row inline">
+          <label for="optMaxSpeechChars">読み上げ上限文字数</label>
+          <input type="number" id="optMaxSpeechChars" min="5" max="1000" style="width: 85px;">
+        </div>
+        <div class="form-row inline">
+          <label for="optDisplayTruncate">画面表示も「以下略」で省略する</label>
+          <input type="checkbox" id="optDisplayTruncate">
+        </div>
+        <div class="form-row inline">
+          <label for="optQueueBoostThreshold">キュー滞留で早口にする件数</label>
+          <input type="number" id="optQueueBoostThreshold" min="1" max="50" style="width: 85px;">
+        </div>
+        <div class="form-row inline">
+          <label for="optBoostRateMultiplier">早口時の速度倍率</label>
+          <input type="number" id="optBoostRateMultiplier" step="0.1" min="1.0" max="4.0" style="width: 85px;">
+        </div>
+      </div>
+
+      <div class="sub-options" id="optGroupWebspeech">
+        <div class="form-row inline">
+          <label for="optWsRate">通常速度</label>
+          <input type="number" id="optWsRate" step="0.1" min="0.5" max="3.0" style="width: 80px;">
+        </div>
+        <div class="form-row inline">
+          <label for="optWsPitch">高さ</label>
+          <input type="number" id="optWsPitch" step="0.1" min="0.1" max="2.0" style="width: 80px;">
+        </div>
+        <div class="form-row inline">
+          <label for="optWsVolume">音量</label>
+          <input type="number" id="optWsVolume" step="0.1" min="0" max="1" style="width: 80px;">
+        </div>
+      </div>
+
+      <div class="sub-options" id="optGroupBouyomi" style="display:none;">
+        <div class="form-row inline">
+          <label for="optBouyomiPort">HTTPポート番号</label>
+          <input type="number" id="optBouyomiPort" style="width: 90px;">
+        </div>
+      </div>
+
+      <div class="sub-options" id="optGroupVoicevox" style="display:none;">
+        <div class="form-row inline">
+          <label for="optVvPort">ポート番号</label>
+          <input type="number" id="optVvPort" style="width: 90px;">
+        </div>
+        <div class="form-row inline">
+          <label for="optVvSpeaker">話者ID (Speaker)</label>
+          <input type="number" id="optVvSpeaker" min="0" style="width: 90px;">
+        </div>
+      </div>
+
+      <div class="form-row" style="margin-top: 10px;">
+        <button class="btn-test" id="btnTestTts" style="width: 100%; padding: 7px;">読み上げテスト</button>
+      </div>
+    </div>
+
+    <!-- 除外設定 -->
+    <div class="setting-group" style="border-bottom: none;">
+      <h4>読み上げ除外設定</h4>
+      <div class="form-row">
+        <label for="optIgnoreUsers">除外ユーザー（カンマ区切り）</label>
+        <input type="text" id="optIgnoreUsers" placeholder="nightbot, streamelements">
+      </div>
+      <div class="form-row">
+        <label for="optIgnorePrefixes">除外する先頭文字（カンマ区切り）</label>
+        <input type="text" id="optIgnorePrefixes" placeholder="!, /">
+      </div>
+      <div class="form-row inline">
+        <label for="optIgnoreUrls">URLを「URL省略」に置換</label>
+        <input type="checkbox" id="optIgnoreUrls">
+      </div>
+    </div>
+  </div>
+
+<script>
+/* =========================================================
+   1. URLパラメータ解析 & 設定管理 (localStorage)
+   ========================================================= */
+const params = new URLSearchParams(window.location.search);
+const channel = params.get('channel')?.trim();
+const isObsMode = params.get('mode') === 'obs';
+
+const STORAGE_KEY = 'twitch_comment_viewer_config_v3';
+
+const defaultConfig = {
+  // 管理画面用
+  fontFamily: '"Noto Sans JP", sans-serif',
+  fontSize: 16,
+  maxComments: 100,
+  // OBS表示用
+  obsFontFamily: '"M PLUS Rounded 1c", sans-serif',
+  obsFontSize: 24,
+  obsBgTransparent: true,
+  obsBgColor: '#00ff00',
+  obsCardTransparent: false,
+  obsCardColor: '#1e1e26',
+  obsTextColor: '#ffffff',
+  obsFirstBgColor: '#991b1b',
+  obsOutline: true,
+  obsSoundEnabled: false,
+  // SE・読み上げ
+  seVolume: 80,
+  firstSoundPath: 'neko.mp3',
+  firstSoundData: '',
+  normalSoundPath: 'ko.mp3',
+  normalSoundData: '',
+  ttsEnabled: true,
+  ttsEngine: 'webspeech',
+  longTextMode: 'truncate_suffix',
+  maxSpeechChars: 60,
+  displayTruncate: false,
+  queueBoostThreshold: 3,
+  boostRateMultiplier: 1.5,
+  wsRate: 1.1,
+  wsPitch: 1.0,
+  wsVolume: 1.0,
+  bouyomiPort: 50080,
+  vvPort: 50021,
+  vvSpeaker: 3,
+  ignoreUsers: 'nightbot, streamelements',
+  ignorePrefixes: '!',
+  ignoreUrls: true,
+  // TXT書き出し
+  exportLines: 10,
+  includeMetaInExport: false,
+  reverseExport: false
+};
+
+let config = loadConfig();
+const commentLogs = [];
+let autoWriteFileHandle = null;
+let isAutoWriting = false;
+
+function loadConfig() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    const merged = saved ? { ...defaultConfig, ...JSON.parse(saved) } : { ...defaultConfig };
+    if (!['webspeech', 'bouyomi', 'voicevox'].includes(merged.ttsEngine)) {
+      merged.ttsEngine = 'webspeech';
+    }
+    return merged;
+  } catch (e) {
+    return { ...defaultConfig };
+  }
+}
+
+function saveConfig() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+    updateObsUrlPreview();
+  } catch (e) {
+    alert('設定の保存に失敗しました（音声ファイルサイズが大きすぎる可能性があります）。');
+  }
+}
+
+/* =========================================================
+   2. OBS用URL生成 & スタイル適用
+   ========================================================= */
+function buildObsUrl() {
+  const url = new URL(window.location.href);
+  if (channel) url.searchParams.set('channel', channel);
+  url.searchParams.set('mode', 'obs');
+  // OBSブラウザソース（別プロセス）でも設定が反映されるようにURLパラメータにも付与
+  url.searchParams.set('font', config.obsFontFamily);
+  url.searchParams.set('size', String(config.obsFontSize));
+  url.searchParams.set('bg', config.obsBgTransparent ? 'transparent' : config.obsBgColor);
+  url.searchParams.set('card', config.obsCardTransparent ? 'transparent' : config.obsCardColor);
+  url.searchParams.set('color', config.obsTextColor);
+  url.searchParams.set('firstbg', config.obsFirstBgColor);
+  url.searchParams.set('outline', config.obsOutline ? '1' : '0');
+  url.searchParams.set('sound', config.obsSoundEnabled ? '1' : '0');
+  return url.toString();
+}
+
+function updateObsUrlPreview() {
+  const el = document.getElementById('obsUrlPreview');
+  if (el) el.value = buildObsUrl();
+}
+
+function applyVisualSettings() {
+  const root = document.documentElement;
+  if (isObsMode) {
+    document.body.classList.add('obs-mode');
+    // URLパラメータ指定があれば優先し、無ければlocalStorageのOBS設定を使用
+    const pFont = params.get('font') || config.obsFontFamily;
+    const pSize = params.get('size') || config.obsFontSize;
+    const pBg = params.get('bg') || (config.obsBgTransparent ? 'transparent' : config.obsBgColor);
+    const pCard = params.get('card') || (config.obsCardTransparent ? 'transparent' : config.obsCardColor);
+    const pColor = params.get('color') || config.obsTextColor;
+    const pFirstBg = params.get('firstbg') || config.obsFirstBgColor;
+    const pOutline = params.has('outline') ? params.get('outline') === '1' : config.obsOutline;
+
+    root.style.setProperty('--font-family', pFont);
+    root.style.setProperty('--font-size', pSize + 'px');
+    root.style.setProperty('--bg-color', pBg);
+    root.style.setProperty('--card-bg', pCard);
+    root.style.setProperty('--text-color', pColor);
+    root.style.setProperty('--first-bg', pFirstBg);
+
+    if (pOutline) document.body.classList.add('obs-outline');
+    else document.body.classList.remove('obs-outline');
+  } else {
+    root.style.setProperty('--font-family', config.fontFamily);
+    root.style.setProperty('--font-size', config.fontSize + 'px');
+    root.style.setProperty('--bg-color', '#121216');
+    root.style.setProperty('--card-bg', '#1e1e26');
+    root.style.setProperty('--text-color', '#efeff1');
+    root.style.setProperty('--first-bg', '#7f1d1d');
+  }
+}
+
+/* =========================================================
+   3. UI初期化・イベントバインド
+   ========================================================= */
+const chatContainer = document.getElementById('chatContainer');
+const seenUsers = new Set();
+
+function initSettingsUI() {
+  applyVisualSettings();
+  if (isObsMode) return; // OBSモード時は管理UI初期化不要
+
+  // 値反映
+  document.getElementById('optFont').value = config.fontFamily;
+  document.getElementById('optFontSize').value = config.fontSize;
+  document.getElementById('optMaxComments').value = config.maxComments;
+
+  document.getElementById('optObsFont').value = config.obsFontFamily;
+  document.getElementById('optObsFontSize').value = config.obsFontSize;
+  document.getElementById('optObsBgTransparent').checked = config.obsBgTransparent;
+  document.getElementById('optObsBgColor').value = config.obsBgColor;
+  document.getElementById('optObsCardTransparent').checked = config.obsCardTransparent;
+  document.getElementById('optObsCardColor').value = config.obsCardColor;
+  document.getElementById('optObsTextColor').value = config.obsTextColor;
+  document.getElementById('optObsFirstBgColor').value = config.obsFirstBgColor;
+  document.getElementById('optObsOutline').checked = config.obsOutline;
+  document.getElementById('optObsSoundEnabled').checked = config.obsSoundEnabled;
+
+  document.getElementById('optSeVolume').value = config.seVolume;
+  document.getElementById('seVolLabel').textContent = config.seVolume;
+  document.getElementById('optFirstSoundPath').value = config.firstSoundPath;
+  document.getElementById('optNormalSoundPath').value = config.normalSoundPath;
+
+  document.getElementById('optTtsEnabled').checked = config.ttsEnabled;
+  document.getElementById('optTtsEngine').value = config.ttsEngine;
+  document.getElementById('optLongTextMode').value = config.longTextMode;
+  document.getElementById('optMaxSpeechChars').value = config.maxSpeechChars;
+  document.getElementById('optDisplayTruncate').checked = config.displayTruncate;
+  document.getElementById('optQueueBoostThreshold').value = config.queueBoostThreshold;
+  document.getElementById('optBoostRateMultiplier').value = config.boostRateMultiplier;
+
+  document.getElementById('optWsRate').value = config.wsRate;
+  document.getElementById('optWsPitch').value = config.wsPitch;
+  document.getElementById('optWsVolume').value = config.wsVolume;
+  document.getElementById('optBouyomiPort').value = config.bouyomiPort;
+  document.getElementById('optVvPort').value = config.vvPort;
+  document.getElementById('optVvSpeaker').value = config.vvSpeaker;
+
+  document.getElementById('optIgnoreUsers').value = config.ignoreUsers;
+  document.getElementById('optIgnorePrefixes').value = config.ignorePrefixes;
+  document.getElementById('optIgnoreUrls').checked = config.ignoreUrls;
+
+  document.getElementById('optExportLines').value = config.exportLines;
+  document.getElementById('optIncludeMetaInExport').checked = config.includeMetaInExport;
+  document.getElementById('optReverseExport').checked = config.reverseExport;
+
+  updateEngineSubOptions();
+  updateObsUrlPreview();
+
+  const panel = document.getElementById('settingsPanel');
+  document.getElementById('btnToggleSettings').addEventListener('click', () => {
+    panel.classList.toggle('open');
+  });
+
+  const bindInput = (id, key, type = 'value', callback) => {
+    const el = document.getElementById(id);
+    el.addEventListener('change', () => {
+      if (type === 'checkbox') config[key] = el.checked;
+      else if (type === 'number') config[key] = Number(el.value);
+      else config[key] = el.value;
+      saveConfig();
+      if (callback) callback();
+    });
+  };
+
+  bindInput('optFont', 'fontFamily', 'value', applyVisualSettings);
+  bindInput('optFontSize', 'fontSize', 'number', applyVisualSettings);
+  bindInput('optMaxComments', 'maxComments', 'number');
+
+  // OBS設定バインド
+  bindInput('optObsFont', 'obsFontFamily', 'value');
+  bindInput('optObsFontSize', 'obsFontSize', 'number');
+  bindInput('optObsBgTransparent', 'obsBgTransparent', 'checkbox');
+  bindInput('optObsBgColor', 'obsBgColor', 'value');
+  bindInput('optObsCardTransparent', 'obsCardTransparent', 'checkbox');
+  bindInput('optObsCardColor', 'obsCardColor', 'value');
+  bindInput('optObsTextColor', 'obsTextColor', 'value');
+  bindInput('optObsFirstBgColor', 'obsFirstBgColor', 'value');
+  bindInput('optObsOutline', 'obsOutline', 'checkbox');
+  bindInput('optObsSoundEnabled', 'obsSoundEnabled', 'checkbox');
+
+  // OBS表示ウィンドウを開くボタン
+  const openObsWindow = () => {
+    const obsUrl = buildObsUrl();
+    window.open(obsUrl, 'TwitchObsViewer', 'width=500,height=700,menubar=no,toolbar=no,location=no,status=no');
+  };
+  document.getElementById('btnOpenObsTop').addEventListener('click', openObsWindow);
+  document.getElementById('btnOpenObsPanel').addEventListener('click', openObsWindow);
+
+  document.getElementById('btnCopyObsUrl').addEventListener('click', () => {
+    const urlInput = document.getElementById('obsUrlPreview');
+    urlInput.select();
+    navigator.clipboard.writeText(urlInput.value).then(() => {
+      alert('OBS用URLをクリップボードにコピーしました！');
+    });
+  });
+
+  // リアルタイムTXT保存バインド
+  bindInput('optExportLines', 'exportLines', 'number', () => { if (isAutoWriting) writeRealtimeTxtFile(); });
+  bindInput('optIncludeMetaInExport', 'includeMetaInExport', 'checkbox', () => { if (isAutoWriting) writeRealtimeTxtFile(); });
+  bindInput('optReverseExport', 'reverseExport', 'checkbox', () => { if (isAutoWriting) writeRealtimeTxtFile(); });
+
+  document.getElementById('btnSelectAutoFile').addEventListener('click', startRealtimeFileSync);
+  document.getElementById('btnAutoWriteTop').addEventListener('click', () => {
+    if (!autoWriteFileHandle) {
+      startRealtimeFileSync();
+    } else {
+      isAutoWriting = !isAutoWriting;
+      updateAutoWriteStatusUI();
+      if (isAutoWriting) writeRealtimeTxtFile();
+    }
+  });
+  document.getElementById('btnManualDownloadTxt').addEventListener('click', downloadTxtFallback);
+
+  // SE・音声ファイル
+  bindInput('optFirstSoundPath', 'firstSoundPath', 'value', () => { config.firstSoundData = ''; saveConfig(); });
+  bindInput('optNormalSoundPath', 'normalSoundPath', 'value', () => { config.normalSoundData = ''; saveConfig(); });
+
+  const seVolInput = document.getElementById('optSeVolume');
+  seVolInput.addEventListener('input', () => {
+    config.seVolume = Number(seVolInput.value);
+    document.getElementById('seVolLabel').textContent = config.seVolume;
+    saveConfig();
+  });
+
+  setupAudioFilePicker('fileFirstSound', 'firstSoundPath', 'firstSoundData');
+  setupAudioFilePicker('fileNormalSound', 'normalSoundPath', 'normalSoundData');
+
+  // 読み上げ設定
+  bindInput('optTtsEnabled', 'ttsEnabled', 'checkbox');
+  bindInput('optTtsEngine', 'ttsEngine', 'value', updateEngineSubOptions);
+  bindInput('optLongTextMode', 'longTextMode', 'value');
+  bindInput('optMaxSpeechChars', 'maxSpeechChars', 'number');
+  bindInput('optDisplayTruncate', 'displayTruncate', 'checkbox');
+  bindInput('optQueueBoostThreshold', 'queueBoostThreshold', 'number');
+  bindInput('optBoostRateMultiplier', 'boostRateMultiplier', 'number');
+
+  bindInput('optWsRate', 'wsRate', 'number');
+  bindInput('optWsPitch', 'wsPitch', 'number');
+  bindInput('optWsVolume', 'wsVolume', 'number');
+  bindInput('optBouyomiPort', 'bouyomiPort', 'number');
+  bindInput('optVvPort', 'vvPort', 'number');
+  bindInput('optVvSpeaker', 'vvSpeaker', 'number');
+
+  bindInput('optIgnoreUsers', 'ignoreUsers', 'value');
+  bindInput('optIgnorePrefixes', 'ignorePrefixes', 'value');
+  bindInput('optIgnoreUrls', 'ignoreUrls', 'checkbox');
+
+  document.getElementById('btnTestFirstSe').addEventListener('click', () => playSE(true));
+  document.getElementById('btnTestNormalSe').addEventListener('click', () => playSE(false));
+  document.getElementById('btnTestTts').addEventListener('click', () => {
+    speakText('これは読み上げテストです。長い文章が来たときやコメントが溜まったときの挙動も確認できます。');
+  });
+
+  let testUserToggle = false;
+  document.getElementById('btnTestComment').addEventListener('click', () => {
+    testUserToggle = !testUserToggle;
+    const uname = testUserToggle ? 'TestUser_' + Math.floor(Math.random() * 100) : 'RegularViewer';
+    const sampleMsg = testUserToggle
+      ? 'とても長いテストコメントです。文字数制限を超えた場合に「以下略」になるか、あるいは早口で読み上げられるかを確認するためのサンプル文章になります。'
+      : '短いテストコメント！';
+    handleIncomingComment(uname, uname, sampleMsg, {});
+  });
+
+  document.getElementById('btnResetUsers').addEventListener('click', () => {
+    seenUsers.clear();
+    alert('初コメ判定履歴をリセットしました。');
+  });
+
+  // 他タブ（OBS別窓）への設定変更即時同期
+  window.addEventListener('storage', (e) => {
+    if (e.key === STORAGE_KEY) {
+      config = loadConfig();
+      applyVisualSettings();
+    }
+  });
+}
+
+function setupAudioFilePicker(fileInputId, pathKey, dataKey) {
+  document.getElementById(fileInputId).addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      config[pathKey] = file.name;
+      config[dataKey] = reader.result;
+      document.getElementById(fileInputId === 'fileFirstSound' ? 'optFirstSoundPath' : 'optNormalSoundPath').value = file.name;
+      saveConfig();
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function updateEngineSubOptions() {
+  document.getElementById('optGroupWebspeech').style.display = config.ttsEngine === 'webspeech' ? 'block' : 'none';
+  document.getElementById('optGroupBouyomi').style.display = config.ttsEngine === 'bouyomi' ? 'block' : 'none';
+  document.getElementById('optGroupVoicevox').style.display = config.ttsEngine === 'voicevox' ? 'block' : 'none';
+}
+
+/* =========================================================
+   4. リアルタイムTXT上書き保存 (File System Access API)
+   ========================================================= */
+function buildExportText() {
+  const lineLimit = Math.max(0, Number(config.exportLines) || 0);
+  let targetLogs = lineLimit > 0 ? commentLogs.slice(-lineLimit) : commentLogs.slice();
+  if (config.reverseExport) {
+    targetLogs = targetLogs.reverse();
+  }
+  const lines = targetLogs.map(entry => {
+    if (config.includeMetaInExport) {
+      return `[${entry.timeStr}] ${entry.displayName}: ${entry.message}`;
+    }
+    return entry.message;
+  });
+  return lines.join('\r\n') + (lines.length ? '\r\n' : '');
+}
+
+async function startRealtimeFileSync() {
+  if (!('showSaveFilePicker' in window)) {
+    alert('お使いのブラウザはファイルのリアルタイム直接上書き（File System Access API）に対応していません。\nChrome または Edge で開くか、「手動で1回ダウンロード保存」をご利用ください。');
+    return;
+  }
+  try {
+    autoWriteFileHandle = await window.showSaveFilePicker({
+      suggestedName: 'obs_comments.txt',
+      types: [{
+        description: 'Text Files',
+        accept: { 'text/plain': ['.txt'] }
+      }]
+    });
+    isAutoWriting = true;
+    updateAutoWriteStatusUI();
+    await writeRealtimeTxtFile();
+  } catch (err) {
+    if (err.name !== 'AbortError') {
+      console.error('ファイル選択エラー:', err);
+    }
+  }
+}
+
+let writeLock = false;
+let pendingWrite = false;
+
+async function writeRealtimeTxtFile() {
+  if (!isAutoWriting || !autoWriteFileHandle) return;
+  if (writeLock) {
+    pendingWrite = true;
+    return;
+  }
+  writeLock = true;
+  try {
+    const writable = await autoWriteFileHandle.createWritable();
+    await writable.write(buildExportText());
+    await writable.close();
+  } catch (err) {
+    console.error('TXTリアルタイム書き込みエラー:', err);
+    isAutoWriting = false;
+    updateAutoWriteStatusUI();
+  } finally {
+    writeLock = false;
+    if (pendingWrite) {
+      pendingWrite = false;
+      writeRealtimeTxtFile();
+    }
+  }
+}
+
+function updateAutoWriteStatusUI() {
+  const topBtn = document.getElementById('btnAutoWriteTop');
+  const statusEl = document.getElementById('autoFileStatus');
+  if (isAutoWriting && autoWriteFileHandle) {
+    topBtn.textContent = `TXT自動保存: ON (${autoWriteFileHandle.name})`;
+    topBtn.classList.add('active');
+    statusEl.textContent = `状態: リアルタイム上書き中 → ${autoWriteFileHandle.name}`;
+    statusEl.style.color = '#4ade80';
+  } else {
+    topBtn.textContent = 'TXT自動保存: OFF';
+    topBtn.classList.remove('active');
+    statusEl.textContent = autoWriteFileHandle
+      ? `状態: 一時停止中 (${autoWriteFileHandle.name})`
+      : '状態: 未設定（ボタンから保存先TXTを指定すると受信ごとに上書き保存します）';
+    statusEl.style.color = '#8e8ea0';
+  }
+}
+
+function downloadTxtFallback() {
+  const text = buildExportText();
+  if (!text) {
+    alert('書き出すコメントログがありません。');
+    return;
+  }
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'obs_comments.txt';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/* =========================================================
+   5. 効果音・読み上げ処理
+   ========================================================= */
+function shouldPlayAudioInThisWindow() {
+  if (!isObsMode) return true;
+  if (params.has('sound')) return params.get('sound') === '1';
+  return config.obsSoundEnabled;
+}
+
+function playSE(isFirst) {
+  if (!shouldPlayAudioInThisWindow()) return;
+  const vol = Math.max(0, Math.min(1, config.seVolume / 100));
+  if (vol === 0) return;
+  const src = isFirst
+    ? (config.firstSoundData || config.firstSoundPath)
+    : (config.normalSoundData || config.normalSoundPath);
+  if (!src) return;
+  const audio = new Audio(src);
+  audio.volume = vol;
+  audio.play().catch(err => console.warn('SE再生エラー:', err));
+}
+
+const speechQueue = [];
+let isSpeakingQueue = false;
+
+function updateQueueCounter() {
+  const el = document.getElementById('queueCounter');
+  if (el) el.textContent = `(待機: ${speechQueue.length})`;
+}
+
+function shouldIgnoreSpeech(username, message) {
+  if (!shouldPlayAudioInThisWindow()) return true;
+  if (!config.ttsEnabled) return true;
+  if (!message || !message.trim()) return true;
+
+  const lowerUser = username.toLowerCase();
+  const ignoreUserList = config.ignoreUsers.split(',').map(u => u.trim().toLowerCase()).filter(Boolean);
+  if (ignoreUserList.includes(lowerUser)) return true;
+
+  const trimmedMsg = message.trim();
+  const prefixes = config.ignorePrefixes.split(',').map(p => p.trim()).filter(Boolean);
+  for (const prefix of prefixes) {
+    if (trimmedMsg.startsWith(prefix)) return true;
+  }
+  return false;
+}
+
+function prepareSpeechPayload(rawMessage) {
+  let text = rawMessage.trim();
+  if (config.ignoreUrls) {
+    text = text.replace(/https?:\/\/[^\s]+/g, 'URL省略');
+  }
+
+  const limit = Math.max(1, Number(config.maxSpeechChars) || 60);
+  const isOverLimit = text.length > limit;
+  let rateMultiplier = 1.0;
+
+  if (isOverLimit) {
+    if (config.longTextMode === 'truncate_suffix') {
+      text = text.slice(0, limit) + '、以下略';
+    } else if (config.longTextMode === 'truncate_only') {
+      text = text.slice(0, limit);
+    } else if (config.longTextMode === 'fast_only') {
+      rateMultiplier = Math.max(1.0, Number(config.boostRateMultiplier) || 1.5);
+    }
+  }
+
+  return { text: text.trim(), rateMultiplier };
+}
+
+function speakText(rawMessage) {
+  const payload = prepareSpeechPayload(rawMessage);
+  if (!payload.text) return;
+
+  speechQueue.push(payload);
+  updateQueueCounter();
+  processSpeechQueue();
+}
+
+async function processSpeechQueue() {
+  if (isSpeakingQueue) return;
+  isSpeakingQueue = true;
+
+  while (speechQueue.length > 0) {
+    const item = speechQueue.shift();
+    updateQueueCounter();
+
+    const queueIsCrowded = speechQueue.length >= Math.max(1, Number(config.queueBoostThreshold) || 3);
+    const activeMultiplier = queueIsCrowded
+      ? Math.max(item.rateMultiplier, Number(config.boostRateMultiplier) || 1.5)
+      : item.rateMultiplier;
+
+    if (config.ttsEngine === 'webspeech') {
+      await speakWebSpeechAsync(item.text, activeMultiplier);
+    } else if (config.ttsEngine === 'bouyomi') {
+      await speakBouyomiAsync(item.text, activeMultiplier);
+    } else if (config.ttsEngine === 'voicevox') {
+      await speakVoicevoxAsync(item.text, activeMultiplier);
+    }
+  }
+
+  isSpeakingQueue = false;
+  updateQueueCounter();
+}
+
+function speakWebSpeechAsync(text, multiplier) {
+  return new Promise((resolve) => {
+    if (!('speechSynthesis' in window)) return resolve();
+    const uttr = new SpeechSynthesisUtterance(text);
+    uttr.lang = 'ja-JP';
+    const baseRate = Number(config.wsRate) || 1.1;
+    uttr.rate = Math.min(3.5, Math.max(0.5, baseRate * multiplier));
+    uttr.pitch = Number(config.wsPitch) || 1.0;
+    uttr.volume = Number(config.wsVolume) || 1.0;
+
+    const voices = window.speechSynthesis.getVoices();
+    const haruka = voices.find(v => v.name.includes('Haruka'));
+    if (haruka) uttr.voice = haruka;
+
+    uttr.onend = () => resolve();
+    uttr.onerror = () => resolve();
+    window.speechSynthesis.speak(uttr);
+  });
+}
+
+function speakBouyomiAsync(text, multiplier) {
+  return new Promise((resolve) => {
+    const speed = Math.min(200, Math.max(50, Math.round(100 * multiplier)));
+    const url = `http://localhost:${config.bouyomiPort}/Talk?text=${encodeURIComponent(text)}&speed=${speed}`;
+    fetch(url, { mode: 'no-cors' }).catch(() => {});
+    setTimeout(resolve, 250);
+  });
+}
+
+async function speakVoicevoxAsync(text, multiplier) {
+  try {
+    const baseUrl = `http://localhost:${config.vvPort}`;
+    const queryRes = await fetch(`${baseUrl}/audio_query?text=${encodeURIComponent(text)}&speaker=${config.vvSpeaker}`, {
+      method: 'POST'
+    });
+    if (!queryRes.ok) return;
+    const queryJson = await queryRes.json();
+    if (multiplier > 1.0 && typeof queryJson.speedScale === 'number') {
+      queryJson.speedScale = Math.min(2.0, queryJson.speedScale * multiplier);
+    }
+
+    const synthRes = await fetch(`${baseUrl}/synthesis?speaker=${config.vvSpeaker}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(queryJson)
+    });
+    if (!synthRes.ok) return;
+
+    const blob = await synthRes.blob();
+    const audioUrl = URL.createObjectURL(blob);
+
+    await new Promise((resolve) => {
+      const audio = new Audio(audioUrl);
+      audio.onended = () => { URL.revokeObjectURL(audioUrl); resolve(); };
+      audio.onerror = () => { URL.revokeObjectURL(audioUrl); resolve(); };
+      audio.play().catch(() => resolve());
+    });
+  } catch (err) {
+    console.warn('VOICEVOX読み上げエラー:', err);
+  }
+}
+
+/* =========================================================
+   6. コメント受信・描画・リアルタイムファイル更新
+   ========================================================= */
+function handleIncomingComment(user, displayName, message, extra) {
+  const userId = user.toLowerCase();
+  const isFirst = !seenUsers.has(userId);
+  if (isFirst) seenUsers.add(userId);
+
+  const now = new Date();
+  const timeStr = now.toTimeString().slice(0, 8);
+  const shownName = displayName || user;
+
+  // ログ蓄積 & リアルタイムTXT上書き保存
+  commentLogs.push({ timeStr, displayName: shownName, message });
+  if (commentLogs.length > 5000) commentLogs.shift();
+  if (!isObsMode && isAutoWriting) {
+    writeRealtimeTxtFile();
+  }
+
+  // 効果音
+  playSE(isFirst);
+
+  // 表示用テキスト
+  let displayMsg = message;
+  const limit = Math.max(1, Number(config.maxSpeechChars) || 60);
+  if (config.displayTruncate && message.length > limit) {
+    displayMsg = message.slice(0, limit) + '…以下略';
+  }
+
+  // DOM描画
+  const item = document.createElement('div');
+  item.className = 'chat-item' + (isFirst ? ' is-first' : '');
+
+  const metaDiv = document.createElement('div');
+  metaDiv.className = 'chat-meta';
+
+  if (isFirst) {
+    const badge = document.createElement('span');
+    badge.className = 'first-badge';
+    badge.textContent = '初コメ';
+    metaDiv.appendChild(badge);
+  }
+
+  const userSpan = document.createElement('span');
+  userSpan.className = 'chat-user';
+  userSpan.style.color = (extra && extra.userColor) ? extra.userColor : '#a970ff';
+  userSpan.textContent = shownName;
+  metaDiv.appendChild(userSpan);
+
+  if (!isObsMode) {
+    const timeSpan = document.createElement('span');
+    timeSpan.className = 'chat-time';
+    timeSpan.textContent = timeStr.slice(0, 5);
+    metaDiv.appendChild(timeSpan);
+  }
+
+  const msgDiv = document.createElement('div');
+  msgDiv.className = 'chat-message';
+  msgDiv.textContent = displayMsg;
+
+  item.appendChild(metaDiv);
+  item.appendChild(msgDiv);
+  chatContainer.appendChild(item);
+
+  while (chatContainer.children.length > config.maxComments) {
+    chatContainer.removeChild(chatContainer.firstChild);
+  }
+
+  if (!isObsMode) {
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+  }
+
+  // 読み上げ実行
+  if (!shouldIgnoreSpeech(user, message)) {
+    speakText(message);
+  }
+}
+
+/* =========================================================
+   7. Twitch連携・初期化
+   ========================================================= */
+if ('speechSynthesis' in window) {
+  window.speechSynthesis.getVoices();
+}
+
+initSettingsUI();
+
+// OBSモードでもlocalStorageの変更を検知して即座に色・フォント反映
+if (isObsMode) {
+  window.addEventListener('storage', (e) => {
+    if (e.key === STORAGE_KEY) {
+      config = loadConfig();
+      applyVisualSettings();
+    }
+  });
+}
+
+if (channel) {
+  ComfyJS.onConnected = () => {
+    const dot = document.getElementById('statusDot');
+    const txt = document.getElementById('statusText');
+    if (dot) dot.classList.add('connected');
+    if (txt) txt.textContent = `接続中: #${channel}`;
+  };
+
+  ComfyJS.onChat = (user, message, flags, self, extra) => {
+    handleIncomingComment(user, extra.displayName || user, message, extra);
+  };
+
+  ComfyJS.onCommand = (user, command, message, flags, extra) => {
+    const fullMessage = message ? `!${command} ${message}` : `!${command}`;
+    handleIncomingComment(user, extra.displayName || user, fullMessage, extra);
+  };
+
+  ComfyJS.Init(channel);
+} else if (!isObsMode) {
+  showChannelPromptOverlay();
+}
+
+function showChannelPromptOverlay() {
+  const overlayDiv = document.createElement('div');
+  overlayDiv.className = 'channel-prompt-overlay';
+  overlayDiv.innerHTML = `
+    <div class="channel-prompt-card">
+      <h2>Twitch チャンネル名を入力</h2>
+      <p>URLパラメータに <strong>?channel=あなたのID</strong> が指定されていません。<br>チャンネル名を入力するとパラメータ付きURLへ移動します。</p>
+      <form class="channel-prompt-form" id="channelPromptForm">
+        <input type="text" id="channelPromptInput" placeholder="例: twitch_user_id" autocomplete="off" required>
+        <button type="submit">移動</button>
+      </form>
+    </div>
+  `;
+  document.body.appendChild(overlayDiv);
+  const inputEl = document.getElementById('channelPromptInput');
+  const formEl = document.getElementById('channelPromptForm');
+  inputEl.focus();
+  formEl.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const inputChannel = inputEl.value.trim().replace(/^#/, '');
+    if (!inputChannel) return;
+    const targetUrl = new URL(window.location.href);
+    targetUrl.searchParams.set('channel', inputChannel);
+    window.location.href = targetUrl.toString();
+  });
+}
+</script>
+</body>
+</html>
