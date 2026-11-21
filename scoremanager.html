@@ -220,6 +220,55 @@
     font-size: 0.85rem;
     margin-top: 32px;
   }
+
+  /* チャンネル入力オーバーレイ */
+  .channel-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 10, 14, 0.88);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    padding: 20px;
+  }
+  .channel-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 28px;
+    width: 100%;
+    max-width: 420px;
+    text-align: center;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  }
+  .channel-card h2 {
+    margin: 0 0 10px;
+    font-size: 1.2rem;
+  }
+  .channel-card p {
+    margin: 0 0 20px;
+    font-size: 0.88rem;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+  .channel-form {
+    display: flex;
+    gap: 8px;
+  }
+  .channel-form input {
+    flex: 1;
+    padding: 10px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: #121216;
+    color: var(--text);
+    font-size: 0.95rem;
+  }
+  .channel-form input:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
 </style>
 </head>
 <body>
@@ -268,7 +317,7 @@
 <script>
 /* --- Twitch連携・初期化セクション --- */
 const params = new URLSearchParams(window.location.search);
-const channel = params.get('channel');
+const channel = params.get('channel')?.trim();
 
 if (channel) {
   ComfyJS.Init(channel);
@@ -277,31 +326,36 @@ if (channel) {
   statusEl.textContent = `#${channel}`;
   statusEl.classList.add('connected');
 } else {
-  showErrorOverlay();
+  showChannelPromptOverlay();
 }
 
-function showErrorOverlay() {
-  const errorDiv = document.createElement('div');
-  errorDiv.style.cssText = `
-    position: fixed;
-    top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.85);
-    color: white;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    z-index: 9999;
-    font-family: sans-serif;
-    text-align: center;
-    padding: 20px;
+function showChannelPromptOverlay() {
+  const overlay = document.createElement('div');
+  overlay.className = 'channel-overlay';
+  overlay.innerHTML = `
+    <div class="channel-card">
+      <h2>Twitch チャンネル名を入力</h2>
+      <p>URLパラメータ <code>?channel=</code> が指定されていません。<br>接続するチャンネル名を入力するとパラメータ付きURLへ移動します。</p>
+      <form class="channel-form" id="channelForm">
+        <input type="text" id="channelInput" placeholder="例: twitch_user_id" autocomplete="off" required>
+        <button type="submit">移動</button>
+      </form>
+    </div>
   `;
-  errorDiv.innerHTML = `
-    <h2 style="color: #ff4b2b;">[Setting Error]</h2>
-    <p>URLパラメータに <strong>?channel=あなたのID</strong> が見つかりません。</p>
-    <p style="font-size: 0.9em; opacity: 0.8;">例: index.html?channel=twitch_user_id</p>
-  `;
-  document.body.appendChild(errorDiv);
+  document.body.appendChild(overlay);
+
+  const inputEl = document.getElementById('channelInput');
+  const formEl = document.getElementById('channelForm');
+  inputEl.focus();
+
+  formEl.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const val = inputEl.value.trim().replace(/^#/, '');
+    if (!val) return;
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.set('channel', val);
+    window.location.href = nextUrl.toString();
+  });
 }
 
 /* --- 状態管理 --- */
@@ -477,7 +531,6 @@ function renderManagedList() {
   }
 
   managedListEl.innerHTML = '';
-  // 追加順（Mapの挿入順）のまま描画
   managedUsers.forEach(u => {
     const row = document.createElement('div');
     row.className = 'score-row';
