@@ -41,13 +41,7 @@
   body.obs-mode .settings-panel {
     display: none !important;
   }
-  body.obs-mode .chat-container {
-    padding: 10px;
-    max-width: 100%;
-    height: 100vh;
-    justify-content: flex-end;
-    overflow: hidden;
-  }
+
   body.obs-mode .chat-item {
     border: none;
     box-shadow: none;
@@ -114,13 +108,85 @@
   }
   .btn-small.obs-btn:hover { background: #6d28d9; }
 
-  .chat-container {
+  .chat-layout {
     padding: 54px 12px 24px;
+    display: flex;
+    gap: 14px;
+    max-width: 1400px;
+    margin: 0 auto;
+    align-items: flex-start;
+  }
+
+  .chat-column {
+    flex: 1;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     gap: 8px;
-    max-width: 900px;
-    margin: 0 auto;
+    max-height: calc(100vh - 68px);
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+
+  .chat-column-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 6px 10px;
+    border-radius: 6px;
+    background: #1a1a24;
+    border: 1px solid #2e2e3e;
+    color: #d1d1dc;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .chat-column-header.ignored-header {
+    background: #231e2b;
+    border-color: #46375e;
+    color: #c4b5fd;
+  }
+
+  .ignored-column {
+    display: none;
+  }
+
+  .chat-layout.split-ignored .ignored-column {
+    display: flex;
+  }
+
+  .chat-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+  }
+
+  body.obs-mode .chat-layout {
+    padding: 10px;
+    max-width: 100%;
+    height: 100vh;
+    overflow: hidden;
+  }
+  body.obs-mode .chat-column {
+    height: 100%;
+    max-height: 100%;
+    overflow-y: hidden;
+    justify-content: flex-end;
+  }
+  body.obs-mode .chat-column-header {
+    display: none;
+  }
+  body.obs-mode .chat-container {
+    padding: 0;
+    max-width: 100%;
+    height: 100%;
+    justify-content: flex-end;
+    overflow: hidden;
   }
 
   .chat-item {
@@ -131,6 +197,21 @@
     line-height: 1.45;
     word-break: break-word;
     animation: slideIn 0.18s ease-out;
+    transition: border-color 1.4s ease, box-shadow 1.4s ease, background-color 1.4s ease;
+  }
+
+  .chat-item.is-latest {
+    border-width: 2px;
+    border-color: rgba(192, 132, 252, 0.92);
+    box-shadow: 0 0 0 2px rgba(169, 112, 255, 0.28), 0 0 16px rgba(169, 112, 255, 0.26);
+    transition: border-color 1.4s ease, border-width 1.4s ease, box-shadow 1.4s ease, background-color 1.4s ease;
+  }
+
+  .chat-item.is-first.is-latest {
+    border-width: 2px;
+    border-color: rgba(252, 165, 165, 0.95);
+    box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.30), 0 0 16px rgba(239, 68, 68, 0.30);
+    transition: border-color 1.4s ease, border-width 1.4s ease, box-shadow 1.4s ease, background-color 1.4s ease;
   }
 
   .chat-item.is-first {
@@ -370,7 +451,22 @@
     </div>
   </div>
 
-  <div class="chat-container" id="chatContainer"></div>
+  <div class="chat-layout" id="chatLayout">
+    <div class="chat-column main-column">
+      <div class="chat-column-header">
+        <span>通常コメント</span>
+        <span id="mainCount" style="font-weight:400; color:#8e8ea0;">0</span>
+      </div>
+      <div class="chat-container" id="chatContainer"></div>
+    </div>
+    <div class="chat-column ignored-column" id="ignoredColumn">
+      <div class="chat-column-header ignored-header">
+        <span>読み上げ除外（!コマンド / Nightbot 等）</span>
+        <span id="ignoredCount" style="font-weight:400; color:#a78bfa;">0</span>
+      </div>
+      <div class="chat-container" id="ignoredChatContainer"></div>
+    </div>
+  </div>
 
   <div class="settings-panel" id="settingsPanel">
     <h3>コメントビューア設定</h3>
@@ -488,6 +584,10 @@
       <div class="form-row inline">
         <label for="optMaxComments">最大表示件数</label>
         <input type="number" id="optMaxComments" min="10" max="500" style="width: 80px;">
+      </div>
+      <div class="form-row inline">
+        <label for="optNewestOnTop">コメントを「上が最新」で表示</label>
+        <input type="checkbox" id="optNewestOnTop">
       </div>
     </div>
 
@@ -614,6 +714,11 @@
         <label for="optIgnoreUrls">URLを「URL省略」に置換</label>
         <input type="checkbox" id="optIgnoreUrls">
       </div>
+      <div class="form-row inline">
+        <label for="optSeparateIgnoredColumn">読み上げ除外コメを別列に表示</label>
+        <input type="checkbox" id="optSeparateIgnoredColumn">
+      </div>
+      <span class="hint">ONにすると「!」コマンドや nightbot などの除外対象コメントが右側の別列に表示されます</span>
     </div>
   </div>
 
@@ -665,6 +770,8 @@ const defaultConfig = {
   ignoreUsers: 'nightbot, streamelements',
   ignorePrefixes: '!',
   ignoreUrls: true,
+  separateIgnoredColumn: true,
+  newestOnTop: false,
   // TXT書き出し
   exportLines: 10,
   includeMetaInExport: false,
@@ -768,6 +875,7 @@ function initSettingsUI() {
   document.getElementById('optFont').value = config.fontFamily;
   document.getElementById('optFontSize').value = config.fontSize;
   document.getElementById('optMaxComments').value = config.maxComments;
+  document.getElementById('optNewestOnTop').checked = config.newestOnTop;
 
   document.getElementById('optObsFont').value = config.obsFontFamily;
   document.getElementById('optObsFontSize').value = config.obsFontSize;
@@ -803,6 +911,8 @@ function initSettingsUI() {
   document.getElementById('optIgnoreUsers').value = config.ignoreUsers;
   document.getElementById('optIgnorePrefixes').value = config.ignorePrefixes;
   document.getElementById('optIgnoreUrls').checked = config.ignoreUrls;
+  document.getElementById('optSeparateIgnoredColumn').checked = config.separateIgnoredColumn;
+  applyColumnLayout();
 
   document.getElementById('optExportLines').value = config.exportLines;
   document.getElementById('optIncludeMetaInExport').checked = config.includeMetaInExport;
@@ -830,6 +940,7 @@ function initSettingsUI() {
   bindInput('optFont', 'fontFamily', 'value', applyVisualSettings);
   bindInput('optFontSize', 'fontSize', 'number', applyVisualSettings);
   bindInput('optMaxComments', 'maxComments', 'number');
+  bindInput('optNewestOnTop', 'newestOnTop', 'checkbox');
 
   // OBS設定バインド
   bindInput('optObsFont', 'obsFontFamily', 'value');
@@ -909,6 +1020,7 @@ function initSettingsUI() {
   bindInput('optIgnoreUsers', 'ignoreUsers', 'value');
   bindInput('optIgnorePrefixes', 'ignorePrefixes', 'value');
   bindInput('optIgnoreUrls', 'ignoreUrls', 'checkbox');
+  bindInput('optSeparateIgnoredColumn', 'separateIgnoredColumn', 'checkbox', applyColumnLayout);
 
   document.getElementById('btnTestFirstSe').addEventListener('click', () => playSE(true));
   document.getElementById('btnTestNormalSe').addEventListener('click', () => playSE(false));
@@ -1097,18 +1209,7 @@ function updateQueueCounter() {
 function shouldIgnoreSpeech(username, message) {
   if (!shouldPlayAudioInThisWindow()) return true;
   if (!config.ttsEnabled) return true;
-  if (!message || !message.trim()) return true;
-
-  const lowerUser = username.toLowerCase();
-  const ignoreUserList = config.ignoreUsers.split(',').map(u => u.trim().toLowerCase()).filter(Boolean);
-  if (ignoreUserList.includes(lowerUser)) return true;
-
-  const trimmedMsg = message.trim();
-  const prefixes = config.ignorePrefixes.split(',').map(p => p.trim()).filter(Boolean);
-  for (const prefix of prefixes) {
-    if (trimmedMsg.startsWith(prefix)) return true;
-  }
-  return false;
+  return isSpeechExcludedComment(username, message);
 }
 
 function prepareSpeechPayload(rawMessage) {
@@ -1234,6 +1335,38 @@ async function speakVoicevoxAsync(text, multiplier) {
 /* =========================================================
    6. コメント受信・描画・リアルタイムファイル更新
    ========================================================= */
+function isSpeechExcludedComment(username, message) {
+  if (!message || !message.trim()) return true;
+  const lowerUser = (username || '').toLowerCase();
+  const ignoreUserList = config.ignoreUsers.split(',').map(u => u.trim().toLowerCase()).filter(Boolean);
+  if (ignoreUserList.includes(lowerUser)) return true;
+
+  const trimmedMsg = message.trim();
+  const prefixes = config.ignorePrefixes.split(',').map(p => p.trim()).filter(Boolean);
+  for (const prefix of prefixes) {
+    if (trimmedMsg.startsWith(prefix)) return true;
+  }
+  return false;
+}
+
+function applyColumnLayout() {
+  const layout = document.getElementById('chatLayout');
+  if (!layout) return;
+  if (!isObsMode && config.separateIgnoredColumn) {
+    layout.classList.add('split-ignored');
+  } else {
+    layout.classList.remove('split-ignored');
+  }
+}
+
+function updateColumnCounts() {
+  const mainEl = document.getElementById('mainCount');
+  const ignoredEl = document.getElementById('ignoredCount');
+  const ignoredContainer = document.getElementById('ignoredChatContainer');
+  if (mainEl) mainEl.textContent = String(chatContainer.children.length);
+  if (ignoredEl && ignoredContainer) ignoredEl.textContent = String(ignoredContainer.children.length);
+}
+
 function handleIncomingComment(user, displayName, message, extra) {
   const userId = user.toLowerCase();
   const isFirst = !seenUsers.has(userId);
@@ -1260,9 +1393,19 @@ function handleIncomingComment(user, displayName, message, extra) {
     displayMsg = message.slice(0, limit) + '…以下略';
   }
 
-  // DOM描画
+  const isExcludedFromSpeech = isSpeechExcludedComment(user, message);
+  const useSeparateCol = !isObsMode && config.separateIgnoredColumn && isExcludedFromSpeech;
+  const targetContainer = useSeparateCol
+    ? document.getElementById('ignoredChatContainer')
+    : chatContainer;
+
+  // DOM描画（件数制限による解除は行わず、各コメントが追加されてから10秒後にそれぞれ解除）
   const item = document.createElement('div');
-  item.className = 'chat-item' + (isFirst ? ' is-first' : '');
+  item.className = 'chat-item' + (isFirst && !useSeparateCol ? ' is-first' : '') + ' is-latest';
+  item._latestTimer = setTimeout(() => {
+    item.classList.remove('is-latest');
+    item._latestTimer = null;
+  }, 10000);
 
   const metaDiv = document.createElement('div');
   metaDiv.className = 'chat-meta';
@@ -1293,15 +1436,28 @@ function handleIncomingComment(user, displayName, message, extra) {
 
   item.appendChild(metaDiv);
   item.appendChild(msgDiv);
-  chatContainer.appendChild(item);
 
-  while (chatContainer.children.length > config.maxComments) {
-    chatContainer.removeChild(chatContainer.firstChild);
+  if (!isObsMode && config.newestOnTop) {
+    // 「上が最新」オプションON時：先頭へ追加し、末尾（古いコメント）を削除
+    targetContainer.insertBefore(item, targetContainer.firstChild);
+    while (targetContainer.children.length > config.maxComments) {
+      targetContainer.removeChild(targetContainer.lastChild);
+    }
+    const colEl = targetContainer.closest('.chat-column');
+    if (colEl) colEl.scrollTop = 0;
+  } else {
+    // デフォルト（下が最新）およびOBSモード：末尾へ追加し、先頭（古いコメント）を削除
+    targetContainer.appendChild(item);
+    while (targetContainer.children.length > config.maxComments) {
+      targetContainer.removeChild(targetContainer.firstChild);
+    }
+    if (!isObsMode) {
+      const colEl = targetContainer.closest('.chat-column');
+      if (colEl) colEl.scrollTop = colEl.scrollHeight;
+    }
   }
 
-  if (!isObsMode) {
-    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-  }
+  updateColumnCounts();
 
   // 読み上げ実行
   if (!shouldIgnoreSpeech(user, message)) {
